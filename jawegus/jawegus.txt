@@ -1,0 +1,117 @@
+﻿alright, here is some hardcore shit
+
+   AWEGUS - Gravis Ultrasound "emulator" for Sound Blaster AWE32/64 v.0.1
+            absolutely copyleft (cl) 2o22 Artem Vasilev - wbcbz7
+
+ 1. wtf?
+ 
+   idk. absolutely at your own risk. if it crashes, you're screwed.
+
+ 2. "features"
+  - classic GUS (GF1) wavetable feature set only
+  - real-mode, V86-friendly applications only
+    DPMI-capable protected mode apps should work if DPMI server will able to 
+    utilize and reflect Jemm's I/O traps. afaik there is yet to write one ;)
+    flat real (aka unreal) mode is not supported since V86 mode forces all
+    segment limits to 64k.
+    actually, for flatreal and V86-unfriendly prods, i can try to make a real
+    mode version and use hardware i/o breakpoints (p5+) for trapping GUS ports
+    but maybe later ;)
+  - 8 bit samples only (16bit support coming soon)
+  - forward loops are supported, one-shots are emulated as tiny 1-sample loop
+    (may cause high pitched noise). backward playback and rollover are not
+    supported, ping-pong loops are treated as forward.
+  - likewise, clicks can occur on loop end (morphing into buzzes on very short
+    loops, like in chiptunes) due to the fact EMU8000 needs more samples at the
+    loop end for 3-point interpolation (GF1 uses linear 2-point)
+  - IRQ/DMA are yet to be emulated. GUS timers overflow right after start, that
+    helps to pass some detection checks.
+    Jemm does not provide any API for IRQ/DMA virtualization, at least now.
+  - Timer Data (2x9) and Index (2xA) readback are also emulated to pass some
+    more detection checks
+  - volume ramping is "emulated" by instant slewing to ramp start/end volume,
+    depending on ramp direction. that will definitely cause clicks in playback.
+    of course it's possible to emulate ramps via EMU8000 envelope generators,
+    but this also require logarithmic pitch to be used instead of linear delta
+    again, not impossible but will complicate and slow emulation a bit.
+  - all channels are processed at full 44100 Hz
+  - max. 28 channels supported (ch 28-29 are reserved for DRAM read/write, and
+    30-31 do FM passthrough and DRAM refresh). GUS channels 28-31 are dropped.
+  - sample frequencies above 176 kHz are silently dropped (EMU8000 limitation)
+
+ 3. system requirements
+  - 386 or higher CPU, fast 486 or Pentium recommended due to V86 mode and I/O
+    trap handling overhead.
+  - ca. 30-40kb of extended memory
+  - Sound Blaster AWE32/64 with at least 2 MB of sound DRAM
+    NOTE: it will NOT work on 512 KB configurations, due to insufficient
+    amount of sound memory for emulation (well, it can emulate 256KB GUS with
+    8bit only samples, but is that worth it?)
+    with 2 MB, you can emulate a 1MB GUS for 8bit only, 512KB for 8/16bit;
+    and full 1 MB model if 4 MB of memory or more is installed.
+
+ 4. usage
+  a. set your BLASTER and ULTRASND environment variables, example:
+      SET BLASTER=A220 I5 D1 H5 E620 P330
+                                ^^^^ EMU8000 base - required!
+      SET ULTRASND=240,3,3,7,7
+                    ^  ^   ^ emulated IRQ
+                    ^   emulated DMA channel
+                    emulated base address
+
+  b. run Jemm, either as device driver or from command line:
+      DEVICE=C:\DOS\JEMM\JEMM386.EXE [parameters..]
+       or
+      JEMM386.EXE LOAD
+
+      you can use JEMMEX (JEMM386 + XMS driver) instead of JEMM386, consult
+      Jemm's docs for more info.
+
+  c. run AWE32/64 drivers. both Creative's original and UNISOUND will work.
+  d. load JAWEGUS using Jemm's JLOAD:
+      JLOAD JAWEGUS.EXE [parameters...]
+
+  e. run ULTRINIT from GUS driver package to initilaize virtual GUS (optional)
+  f. try any GUS software. maybe it'll even work :)
+  g. when you're done, you can remove emulator by running:
+      JLOAD -U JAWEGUS.EXE
+
+    oh, and by the way, both SB16 and FM parts will still work alongside
+    (FM part may be silent due to the way GUS mute is handled)
+
+ 5. command line switches
+    coming soon. at now, AWEGUS is locked to EMU base 0x620 and GUS 0x240.
+ 
+ 6. more stuff
+    right now seems to work well with apps using GusPlay by Cascada, other
+    players may still bug a bit or break completely.
+
+    thanks to Peter De Wachter for ADLIPT sources! without them this little
+    emu will not be possible (or rather i won't be bothered making it :)
+
+ 7. license
+    alright (broken formatting incoming):
+
+Copyright (c) 2022 Artem Vasilev - wbcbz7
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+ -- wbcbz7 24.11.2o22
+ 
+     

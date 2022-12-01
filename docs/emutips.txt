@@ -1,0 +1,56 @@
+on position update and emu8000 quirks (again):
+P = pos, S = loop start, E = loop end
+
+gf1: TBD
+    S > E:
+        P <  E: P counts to E, then:
+        P >= E: P stops at S (forward) or E (ping-pong), P >= E condition always true 
+
+emu8000:
+    S < E: 
+        P <  E: P counts to E, then resets to S
+        P >= E: position overflow, either plays backwards to E then resets to S and plays normally,
+                or quickly jumps forward and wraps to 0, then plays normally
+    S > E:
+        P <  E: P counts to E, then position overflow
+        P >= E: position overflow
+    
+    this means, in some combinations, P could overflow during register update
+    gf1 handles it fine, while emu8k sends you into the ROM
+
+possible solutions:
+if channel is stopped (ctrl & 3 != 0), set pitch to 0, that will stop chan at current sample
+if new E <= P, save current P, set P to 0x100 (this has sample 0, may click but at l), then set new E
+if new S >= E, do the same, plus set E to end of DRAM (emualte GF1 behavior). restore if (S < E)!
+if new P >= E, save updated P in emu state but write 0x100 to emu8k
+
+in all three cases, mute the channel, don't forget to unmute after start!
+(this does not match with GF1 behavior but at least eliminates some of the clicks)
+
+if channel is started (ctrl & 3 == 0), unconditionally restore P (if hasn't rewritten)
+
+another variant:
+if new E <= P:
+    - save new E in emu8k state, read and save current P in emu8k state(?)
+    - set pitch = 0
+    - write P = S = E-1-(pitch>>14) to emu8k
+    - restore pitch
+
+if new P >  E:
+    - save new P and E in emu8k state
+    - set pitch = 0
+    - write P = S, E = S+1+(pitch>>14) to emu8k
+    - restore pitch if playing
+
+if new S >= E:
+    - save S, E, read and save P in emu8k state
+    - set pitch = 0
+    - write P = S = E-1-(pitch>>14) to emu8k
+    - restore pitch if playing
+
+this will match with GF1 behavior, afaik. anyway, needs more testing :)
+
+during channel stop, do not write new pitch/volume to emu8k, save in state
+in all cases, set "full position restore" flag, which becomes active when channel is started (ctrl & 3 != 0)
+if so:
+    - restore S, E, P (in that order), then pitch and finally volume

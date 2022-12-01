@@ -1,0 +1,32 @@
+there are lots of bugs :D
+
+
+
+## General
+
+* samples click and buzz like hell! apparently EMU8000's 3 (or 4?) point interpolation needs some more tweaking to make it work as needed
+  * possible solutions - pad loop end with dummy samples manually, shift loop points for long non-chippy loops, etc...
+* alright, seems you can't touch channels 30-31 at all, they indeed control the DRAM refresh?
+  * hack - make ch 31 play through entire memory to keep it refreshed?
+  * apparently DRAM refresh is not the issue here, must be interpolator overflow instead
+* 16 bit samples are not implemented yet
+* DRAM read/write position caching needs to be fixed. disabled for now
+* volume ramping is buggy and effectively doesn't work
+  * can be emulated more or less properly via EMU8000 envelope generator, but it will also require log pitch instead of delta (you can't turn pitch envelope off while keeping volume envelope running!)
+* timers are basically detection check stubs (overflow the moment it's unmasked and started)
+* IRQ/DMA is yet to be implemented
+
+
+
+## Application-specific
+
+* Impulse Tracker - volume bars practically don't work, samples cut off early or pop out of nowhere - clearly a volume ramping issue
+* Second Reality - 1st music (in the intro) drops channels, 2nd (the 1st part) just plays complete mess. didn't tested further :)
+  * upd: 
+* [So Be It/Xtacy](https://www.pouet.net/prod.php?which=1025) - uploads samples always on 0x220 but controls GF1 playback on user selected port. also crashes with reset on phong part:
+  * from [pouet comment](https://www.pouet.net/prod.php?post=845293): *Crashes in DOSBox (all builds so far) at the "phong environment mapping" part due to corrupt MCB chain. Works all the way in PCem at 486/66, but without music (seems to want the GUS at 220/7/1, while PCem forces 240/5/3).*
+* [Bugfixed/Acme](https://www.pouet.net/prod.php?which=1117) - all samples are very short loops for some reason. also, uses 16bit samples and ping-pong loops
+  * alright, I got it - player constantly rewrites channel control (reg 0x00), which in turn, triggers emu8k loop point update, which further triggers current position update. oops.
+    also, seems to enable bidir loop without enabling regular loop as well
+* [Abraham/Plant](https://www.pouet.net/prod.php?which=1201) - ~~some channels play ROM crap alongside with the music~~ now it's much better, but bass sample is not looped (gets cut off) and there is lot of hifreq whining. perhaps bass uses volume ramping for slides
+

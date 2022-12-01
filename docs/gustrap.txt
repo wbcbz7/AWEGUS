@@ -1,0 +1,222 @@
+i/o port map:
+    addr  bits  sz   RW  trap?             description                    notes
+    ---------------------------------------------------------------------------
+    3x0         b    rw   .    MIDI Control/Status
+    3x1         b    rw   .    MIDI Transmit/Recieve
+    3x2         bw   rw   y    GF1 Page/Channel Index                      (1)
+    3x3         b    rw   y    GF1 Register Index                          (1)
+    3x4         bw   rw   y    GF1 16bit Data Low                          (2)
+    3x5         b    rw   y    GF1 16bit Data High / 8bit Data             (2)
+    3x6         b    rw   .    GUS MAX Control port
+    3x7         b    rw   y    GF1 DRAM Data
+    
+    2x0         b    w    y    Mix Control Register                        (3)
+           0         w    d     Line In Control  (0=ON |1=Off)
+           1         w    y     Line Out Control (0=ON |1=Off)
+           2         w    d     Mic In Control   (0=Off|1=On)
+           3         w    d     DMA/IRQ Latches Enable
+           4         w    d     IRQ1/2 Combine
+           5         w    d     MIDI Tx/Rx loopback
+           6         w    y     2xB Register Select (0=DMA|1=IRQ)
+           7         w    d     Reserved, 0
+
+    2x6         b    r    y    IRQ Status Register
+           0         r    y     MIDI Transmit IRQ
+           1         r    y     MIDI Receive IRQ
+           2         r    y     Timer 1 IRQ
+           3         r    y     Timer 2 IRQ
+           4         r    y     Reserved, 0
+           5         r    y     Wavetable IRQ Pending
+           6         r    d     Volume Ramp IRQ Pending
+           7         r    d     DMA TC IRQ Pending
+    
+    2x8         b    rw   y    AdLib/Timer Status/Register Index           (4)
+           6         r    y     Timer 1 Expired
+           5         r    y     Timer 2 Expired
+           
+           7:0       w          Register Index (read via 2xA)
+                                write 04 to select Timer Control
+
+    2x9         b    w    y    Timer Control (index 0x04)
+           7         w    y     Clear Timer IRQ
+           6         w    y     Mask Timer 1
+           5         w    y     Mask Timer 2
+           1         w    y     Timer 2 Start
+           0         w    y     Timer 1 Start
+                                other bits are 0
+
+           7:0       rw   y    AdLib Data Latch (index other than 0x04)
+
+    2xA    7:0  b    r    y    AdLib/Timer Register Index Readback
+
+    2xB         b    w    y    IRQ/DMA Control Register
+        IRQ:
+           2:0       w    y     Channel 1 IRQ (GF1)                        (5)
+           5:3       w    y     Channel 2 IRQ (MIDI)                       (5)
+           6         w    y     Combine IRQs as IRQ Channel 1
+           7         w    y     Reserved, 0
+        DMA:
+           2:0       w    y     Channel 1 DMA                              (6)
+           5:3       w    y     Channel 2 DMA                              (6)
+           6         w    y     Combine DMAs on the same channel
+           7         w    y     Reserved, 0
+
+ RW:    r - read, w - write, s - modified by GF1
+ trap?: . - no, y - yes, d - yes but return dummy data
+
+ notes:
+ (1): word read/write at 3x2 is permitted (lobyte - 3x2, hibyte - 3x3)
+      reading 3x3 reflects last IO to 3x2-3x5 (not on Interwave)
+ (2): byte writes to 16bit registers are apparently allowed?
+      8bit regs are implemented as hibyte of 16bit
+ (3): idk
+ (4): emulates AdLib timers, reads return Status data, writes select registers
+ (5): IRQ values: 0:   DO NOT USE (Ch0)/Disabled (Ch1)
+                  1-7: IRQ 2/5/3/7/11/12/15
+ (6): DMA values: 0:   No DMA, 1-5: DMA 1/3/5/6/7, 6-7: reserved?
+
+register map:
+    addr  bits  sz  RW  trap?             description                     notes
+    ---------------------------------------------------------------------------
+  global:
+    0x41        8         y    DRAM DMA Control
+           7         w    y     Invert MSB
+           6         w    y     Data size (0=8|1=16 bit)
+                     r    y     DMA IRQ Pending
+           5         rw   y     DMA IRQ Enable
+           4:3       rw   d     DMA Rate Divisor
+           2         rw   d     DMA Channel Width (0=ch0-3|1=ch4-7)
+           1         rw   d     DMA Direction (0=playback|1=record)
+           0         rw   y     DMA Start (0=idle?|1=start)
+
+    0x42        16   w    d    DMA Start Address (A[19:4])
+    0x43        16   w    y    DRAM I/O Address  (A[15:0])
+    0x44        8    w    y    DRAM I/O Address  (4'b0, A[19:16])
+
+    0x45        8         y    Timer IRQ Control
+           3         w    y     Timer 2 IRQ Enable
+           2         w    y     Timer 1 IRQ Enable
+                                other bits are 0
+    
+    0x46        8    w    y    Timer 1 Count (80us,  count up to FF)
+    0x47        8    w    y    Timer 2 Count (320us, count up to FF)
+
+    0x48        8    w    d    Sampling Frequency
+
+    0x49        8    rw   d    Sampling Control
+           7         w    d     Invert MSB
+           6         r    d     DMA IRQ Pending
+           5         rw   d     DMA IRQ Enable
+           4:3       rw   d     Reserved, 0
+           2         rw   d     DMA Width (0=8|1=16 bit)
+           1         rw   d     Sampling Mode (0=mono|1=stereo)
+           0         rw   d     Sampling Start (0=idle?|1=start)
+
+    0x4B        8    w    d    Joystick trim DAC
+
+    0x4C        8    rw   y    RESET                                       (1)
+           2         rw   y     GF1 Master (Wave/Ramp) IRQ Enable
+           1         rw   y     DAC Enable
+           0         rw   y     GF1 Master Reset
+                                other bits are 0
+                                bit0=0 resets bits2:1 to 0
+
+  local (add 0x80 to register index for read)
+    0x00       8     rws  y    Voice Control
+           0         rws  y     Voice Stopped
+           1         rw   y     Force Voice to Stop
+           2         rw   y     Sample Width (0=8bit|1=16bit)
+           3         rw   y     Loop Enable
+           4         rw   y     Bi-Dir Loop Enable
+           5         rw   y     IRQ Enable
+           6         rws  d     Direction (0=forward|1=backward)
+           7         r    d     IRQ Pending
+
+    0x01       16    rw   y    Frequency Control 
+           15:0      rw   y     Sample Delta (6.10fx, bit 0 ignored)       (2)
+
+    0x02       16    rw   y    Starting Address HIGH                       (3)
+    0x03       16    rw   y    Starting Address LOW                        (3)
+    0x04       16    rw   y    End Address HIGH                            (3)
+    0x05       16    rw   y    End Address LOW                             (3)
+
+    0x06       8     rw   y    Volume Ramp Rate                            (4)
+           5:0       rw   y     Increment Value
+           7:6       rw   y     Increment Rate
+
+    0x07       8     rw   y    Volume Ramp Start                           (4)
+           7:4       rw   y     Exponent
+           3:0       rw   y     Mantissa (high 4 bits)
+    0x08       8     rw   y    Volume Ramp End                             (4)
+           7:4       rw   y     Exponent
+           3:0       rw   y     Mantissa (high 4 bits)
+    0x09       16    rws  y    Current Volume                              (4)
+           15:12     rws  y     Exponent
+           11:4      rws  y     Mantissa
+           3:0       rw   y     Reserved, 0
+
+    0x0A       16    rw   y    Current Address (HIGH)                      (3)
+    0x0B       16    rw   y    Current Address (LOW)                       (3)
+
+    0x0C       8     rw   y    Pan Position (4'b0, Pan)
+
+    0x0D       8     rw   y    Volume Control
+           0         rws  y     Ramp Stopped
+           1         rw   y     Force Ramp to Stop
+           2         rw   y     Sample Rollover
+           3         rw   y     Loop Enable
+           4         rw   y     Bi-Dir Loop Enable
+           5         rw   y     IRQ Enable
+           6         rws  d     Direction (0=forward|1=backward)
+           7         r    d     IRQ Pending
+
+    0x0E       8     rw   y    Active Voices (Voice independent)
+           4:0       rw   y     Active voices # minus 1 (13-31)
+           5         rw   y     Reserved, 0
+           6:7       rw   y     Reserved, 1(!)
+
+    0x8F       8     r    y    IRQ Status (Voice independent)
+           4:0       r    y     Voice #
+           5         r    y     Reserved, 1
+           6         r    y     Volume Ramp IRQ Pending
+           7         r    y     Wavetable IRQ Pending
+
+ notes:
+ (1): during 16bit read, returns same data in low and high byte
+      timer IRQs are not affected by IRQ Master Enable (bit 2)
+ (2): GF1 uses 6.10 fixedpoint format with LSB of fractional part ignored
+ (3): Address Format:
+      HIGH: 15:13 - unused, 12:0 - A[19:7]
+      LOW:  15:9  - A[6:0], 8:0  - fractional[8:0] 
+                                   (4:0 are unused for start/end address)
+ (4): volume conversion:
+      linear_vol = (256 + mantissa) * 2^(exponent - 24)       [0..1 range]
+      basically implements piecewise logarithmic approximation, so
+      every increment/decrement of 12bit value by 1 changes the volume
+      by [6/256] ~= 0.0235 db (with 0xFFF = 0db and 0x000 is -inf)
+
+      volume ramping is done by adding/subtracting increment value to
+      current volume every 2^(rate * 3) sample processed, until ramp
+      boundary (either start of end, depending on direction) is reached.
+      that is, if sample rate is 22050Hz (28 channels active), and ramp
+      rate is 01, then ramp update rate is 22050/8 = 2756.25 Hz
+
+ addressing notes:
+      for Wavetable and DMA transfers, A[19:0] is internally translated to
+      memory address MA[19:0]:
+      8bit:   MA[19:0] =  A[19:0]
+      16bit:  MA[19:0] = {A[19:18], A[16:0], 1'b0}
+      local memory access via 3x7 uses 8bit translation
+
+  i/o breakpoints implementation nodes (iobp version only):
+  unfortunately GUS ports needed for the emualtion are sparsely allocated,
+  so we have to use all 4 breakpoints available:
+      - 3x2-3x3 (word)
+      - 3x4-3x7 (dword)
+      - 2x8-2xB (dword) 
+        - 3xB is not much important (used to IRQ/DMA configuration), but 3xA
+          is queried in detection routines, so we need to trap it anyway
+      - 2x6 (byte)
+        - 2x6 is required for IRQ operation, 2x0 is write-only and most
+          software use it just for line in/out control. can be ignored.
+
