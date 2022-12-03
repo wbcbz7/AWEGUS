@@ -51,8 +51,12 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
     // stop emulation timer (TODO)
     // stop pending DMA stuff (TODO)
     emu8k_state.irqemu.rampmask = emu8k_state.irqemu.wavemask = emu8k_state.irqemu.rollovermask = 0;
+    
+    // reset DRAM interface emulation
     gus_state.wordlatch.w = 0;
     gus_state.dramreadpos = gus_state.dramwritepos = 0;
+    emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALR, EMU8K_DRAM_OFFSET);
+    emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, EMU8K_DRAM_OFFSET);
 
     // NOTE: interwave docs mention that not all registers are actually reset
     // reset general registers to defaults
@@ -454,13 +458,13 @@ void gusemu_update_channel(uint32_t ch, uint32_t flags) {
 
     // process volume
     // test if volume ramps required
-    if (guschan->volctrl.h & 3) {
+    if ((guschan->volctrl.h & 3) == 0) {
         // skip them entirely (until ramp emulation implemented)
-        if ((guschan->volctrl.h & (1 << 6)) && (flags & GUSEMU_CHAN_UPDATE_RAMPSTART)) {
+        if (guschan->volctrl.h & (1 << 6)) {
             // ramp down
             guschan->volume.w = guschan->ramp_start.w;
             flags |= GUSEMU_CHAN_UPDATE_VOLUME;
-        } else if (flags & GUSEMU_CHAN_UPDATE_RAMPEND) {
+        } else {
             // ramp up
             guschan->volume.w = guschan->ramp_end.w;
             flags |= GUSEMU_CHAN_UPDATE_VOLUME;
