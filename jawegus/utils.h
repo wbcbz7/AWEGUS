@@ -6,15 +6,6 @@
 // "debug" watchpoint using palette :)
 #define RASTER(r, g, b) {outp(0x3c8, 0);outp(0x3c9, (r));outp(0x3c9, (g));outp(0x3c9, (b));}
 
-void jlm_memcpy(void *dst, void *src, uint32_t count);
-#pragma aux jlm_memcpy parm [edi] [esi] [ecx] modify [eax ecx esi edi]
-
-void jlm_memset(void *dst, uint32_t data, uint32_t count);
-#pragma aux jlm_memset parm [edi] [eax] [ecx] modify [ecx edx esi edi]
-
-void jlm_memsetd(void *dst, uint32_t data, uint32_t count);
-#pragma aux jlm_memsetd parm [edi] [eax] [ecx] modify [ecx esi edi]
-
 // get environment block (list of ASCIIZ strings)
 const char* getenvblock();
 

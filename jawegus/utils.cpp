@@ -1,50 +1,6 @@
 #include "utils.h"
 
-// a couple fo string functions
-
-
-// memcpy, with count == 0 guard
-__declspec(naked) void jlm_memcpy(void *dst, void *src, uint32_t count) {
-    _asm {
-            jcxz    _end
-            mov     eax, ecx
-            shr     ecx, 2
-            rep     movsd
-            mov     ecx, eax
-            and     ecx, not 3
-            jz      _end
-            rep     movsb
-        _end:
-            ret
-    }
-}
-
-// memset
-__declspec(naked) void jlm_memset(void *dst, uint32_t data, uint32_t count) {
-    _asm {
-            jcxz    _end
-            mov     edx, ecx
-            shr     ecx, 2
-            rep     stosd
-            mov     ecx, edx
-            and     ecx, not 3
-            jz      _end
-            rep     stosb
-        _end:
-            ret
-    }
-}
-
-// memset, 32bit
-__declspec(naked) void jlm_memsetd(void *dst, uint32_t data, uint32_t count) {
-    _asm {
-            shr     ecx, 2
-            jcxz    _end
-            rep     stosd
-        _end:
-            ret
-    }
-}
+// a couple of string functions
 
 // get environment block (list of ASCIIZ strings)
 const char* getenvblock() {

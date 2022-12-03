@@ -12,7 +12,7 @@ CFLAGS16 = -ms -s -I=$(INCLUDE)
 LFLAGS   =
 AFLAGS   = -f win32 -l $<.lst
 
-OBJS     = $(TARGET).obj console.obj jlm.obj utils.obj iotrap.obj gusemu.obj emu8000.obj
+OBJS     = $(TARGET).obj console.obj cmdline.obj jlm.obj utils.obj iotrap.obj gusemu.obj emu8000.obj
 OBJSTR   = file {$(OBJS)}
 
 STUBOBJS = stub16.obj

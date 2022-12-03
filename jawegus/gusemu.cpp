@@ -75,7 +75,7 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
     // reset channel registers
     for (int ch = 0; ch < 32; ch++) {
         // reset EMU8000 state and mute channel
-        jlm_memset(emu8k_state.chan + ch, 0, sizeof(emu8k_state.chan[0]));
+        tiny_memset(emu8k_state.chan + ch, 0, sizeof(emu8k_state.chan[0]));
 
         // reset GUS state
         
@@ -145,7 +145,6 @@ uint32_t gusemu_init(gusemu_init_t *init) {
     }
 
     // done
-    printf("GUS emulation at port %X installed\r\n", gus_state.iobase);
     return 1;
 
 _fail_cleanup:

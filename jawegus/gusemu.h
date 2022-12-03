@@ -9,6 +9,11 @@ struct gusemu_init_t {
     uint32_t emuflags;      // emulation flags (see below)
     uint32_t memsize;       // in KBYTES
     
+    // SB16 resources
+    uint16_t sbbase;
+    uint8_t  sbirq;
+    uint8_t  sbdma;
+
     uint16_t emubase;       // emu8000 base address
     uint16_t timerbase;     // emulation timer base
     uint8_t  timerirq;      // --//--          irq

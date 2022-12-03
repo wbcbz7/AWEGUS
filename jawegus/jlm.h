@@ -56,7 +56,6 @@ Yield = 0x1002B
 MoveMemory = 0x1002C
 _Allocate_GDT_Selector = 0x1002D
 _Free_GDT_Selector = 0x1002E
-Get_DD
 */
 
 #define DLL_PROCESS_ATTACH 1
