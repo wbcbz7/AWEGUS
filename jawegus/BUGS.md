@@ -20,13 +20,17 @@ there are lots of bugs :D
 
 ## Application-specific
 
-* Impulse Tracker - volume bars practically don't work, samples cut off early or pop out of nowhere - clearly a volume ramping issue
+* GUSPlay applications almost always work fine, with minor whining if samples are not looped properly
+* Impulse Tracker - volume bars practically don't work, samples cut off early or pop out of nowhere
 * Second Reality - 1st music (in the intro) drops channels, 2nd (the 1st part) just plays complete mess. didn't tested further :)
-  * upd: 
+  * upd: had to fix it somehow... still sounds weird a bit but no dropped samples or ROM sounds. seems like DRAM refresh broke again, as corruption sounds change the pitch wrt sample pitch
+    bonus: "blue dots tornado" part starts just fine (it's prone to crash if path to the demo is too long) but soon GPFs and hangs the machine (music still plays)
 * [So Be It/Xtacy](https://www.pouet.net/prod.php?which=1025) - uploads samples always on 0x220 but controls GF1 playback on user selected port. also crashes with reset on phong part:
   * from [pouet comment](https://www.pouet.net/prod.php?post=845293): *Crashes in DOSBox (all builds so far) at the "phong environment mapping" part due to corrupt MCB chain. Works all the way in PCem at 486/66, but without music (seems to want the GUS at 220/7/1, while PCem forces 240/5/3).*
 * [Bugfixed/Acme](https://www.pouet.net/prod.php?which=1117) - all samples are very short loops for some reason. also, uses 16bit samples and ping-pong loops
   * alright, I got it - player constantly rewrites channel control (reg 0x00), which in turn, triggers emu8k loop point update, which further triggers current position update. oops.
     also, seems to enable bidir loop without enabling regular loop as well
+  * upd: works for now! lots of whining but otherwise fine enough. also needs a lot of low RAM
 * [Abraham/Plant](https://www.pouet.net/prod.php?which=1201) - ~~some channels play ROM crap alongside with the music~~ now it's much better, but bass sample is not looped (gets cut off) and there is lot of hifreq whining. perhaps bass uses volume ramping for slides
+  * upd: ALRIGHT i broke it again :( have absolutely no idea why
 

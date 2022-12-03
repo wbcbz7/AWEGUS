@@ -59,5 +59,6 @@ stub16.obj: stub16.cpp
 clean: .symbolic
 	del $(TARGET).dll
 	del *.map
+	del *.lst
 	del *.obj
 	del *.err

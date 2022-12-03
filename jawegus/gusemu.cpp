@@ -20,7 +20,7 @@ void gusemu_emu8k_reset() {
     emu8k_dramEnable(emu8k_state.iobase, true);
     emu8k_initChannels(emu8k_state.iobase, 14);
     emu8k_setFlatEq(emu8k_state.iobase);
-    emu8k_disableOutput(emu8k_state.iobase);
+    //emu8k_disableOutput(emu8k_state.iobase);      // keep it enabled for FM passthru
     emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALR, EMU8K_DRAM_OFFSET);
     emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, EMU8K_DRAM_OFFSET);
 }
@@ -46,6 +46,11 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
 
         // reset EMU8000
         gusemu_emu8k_reset();
+
+        // clear all GF1 registers
+        for (int ch = 0; ch < 32; ch++) {
+            tiny_memset(&gus_state.gf1regs.chan[ch], 0, sizeof(gus_state.gf1regs.chan[ch]));
+        }
     }
 
     // stop emulation timer (TODO)
@@ -98,8 +103,8 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
         gus_state.gf1regs.chan[ch].pos_low.w    = 0x0000;   // 0A: pos   high
         gus_state.gf1regs.chan[ch].pos_high.w   = 0x0000;   // 0B: pos   low
         gus_state.gf1regs.chan[ch].pan.w        = 0x0700;   // 0C: pan
-        gus_state.gf1regs.chan[ch].volctrl.w    = 0x0100;   // 0D: ramp  control
         */
+        gus_state.gf1regs.chan[ch].volctrl.w    = 0x0100;   // 0D: ramp  control
     }
 
     // reinit active channels
@@ -135,7 +140,7 @@ uint32_t gusemu_init(gusemu_init_t *init) {
         goto _fail_cleanup;
     }
 
-    // init EMU8000 as following: 14 channels for playback, rest (interleaved) for local memory access
+    // init EMU8000 as following: 14 channels for playback, rest (interleaved) for local memory access and FM passthru
     gusemu_emu8k_reset();
 
     // TODO: IRQ/DMA virtualization init (JEMM doesn't provide any interfaces so ignore for now)
@@ -200,7 +205,7 @@ uint32_t gusemu_translate_pitch(uint32_t gf1pitch) {
 
 // transate gf1->emu8k volume, gf1vol in 4.12 format
 uint32_t gusemu_translate_volume(uint32_t gf1vol) {
-    // this one if pretty straightforward
+    // this one if pretty straightforward, note extra precision
     return ((4096 + (gf1vol & 0xFFF)) << (gf1vol >> 12)) >> 12; // ugh
 }
 
@@ -244,14 +249,26 @@ uint32_t gusemu_get_current_pos(uint32_t ch) {
         // no translation required
         pos -= gus_state.mem8start;
     }
-    return pos;
+    return pos + 1; // handle emu8k offset
 };
 
 // process output enable
 void gusemu_process_output_enable() {
-    // TODO: mute all channels except 30&31 (to make FM passthru work)
-    ((gus_state.gf1regs.reset & 2) == 0) || (((gus_state.mixctrl & 2) != 0)) ?
-        emu8k_disableOutput(emu8k_state.iobase) : emu8k_enableOutput(emu8k_state.iobase);
+    if (((gus_state.gf1regs.reset & 2) == 0) || (((gus_state.mixctrl & 2) != 0))) {
+        gus_state.emuflags |=  GUSEMU_STATE_MUTED;
+        // save current volume and mute channels
+        for (int ch = 0 ; ch < emu8k_state.active_channels; ch++) {
+            if ((emu8k_state.chan[ch].flags & EMUSTATE_CHAN_INVALID_POS) == 0) 
+                emu8k_state.chan[ch].volume = emu8k_read(emu8k_state.iobase, ch + EMU8K_REG_CVCF) >> 16;
+        }
+    } else {
+        gus_state.emuflags &= ~GUSEMU_STATE_MUTED;
+        // restore current volume
+        for (int ch = 0 ; ch < emu8k_state.active_channels; ch++) {
+            if ((emu8k_state.chan[ch].flags & EMUSTATE_CHAN_INVALID_POS) == 0) 
+                emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CVCF, (emu8k_state.chan[ch].volume << 16) | 0xFFFF);
+        }
+    }
 }
 
 // update DRAM pointers (unused?)
@@ -421,8 +438,11 @@ uint32_t gusemu_get_volume_ctrl(uint32_t ch) {
 }
 
 // validate play/loop positions
-bool gusemu_validate_pos(uint32_t pos, uint32_t loopstart, uint32_t loopend, uint32_t pitch) {
-    return ((loopstart <= (loopend - 1 - (pitch >> 14))) && (pos <= (loopend - 1 - (pitch >> 14))));
+bool gusemu_validate_pos(uint32_t pos, uint32_t loopstart, uint32_t loopend, uint32_t pitch, uint32_t flags) {
+    bool valid = true;
+    if ((flags & EMUSTATE_CHAN_ONESHOT) == 0)
+        valid = (valid && (loopstart <= (loopend - 1 - (pitch >> 14))));
+    return (valid && (pos < loopend));
 }
 
 // write positions to emu8k
@@ -439,7 +459,6 @@ void gusemu_write_loop_end(uint32_t ch, uint32_t pos) {
 
 // alright, now to the very core of emulation
 // update channel state
-// upd: this needs to be refactored, due to emu8k playback quirks
 void gusemu_update_channel(uint32_t ch, uint32_t flags) {
     // channels 28-31 are not supported for now and silently ignored
     // also do not let emulation to tamper with dram-assigned channels
@@ -456,22 +475,28 @@ void gusemu_update_channel(uint32_t ch, uint32_t flags) {
         emuchan->pan = pan;
     }
 
-    // process volume
-    // test if volume ramps required
-    if ((guschan->volctrl.h & 3) == 0) {
-        // skip them entirely (until ramp emulation implemented)
-        if (guschan->volctrl.h & (1 << 6)) {
-            // ramp down
-            guschan->volume.w = guschan->ramp_start.w;
+    // process volume control
+    if (flags & GUSEMU_CHAN_UPDATE_VOLCTRL) {
+        // test if volume ramps required
+        if (((guschan->volctrl.h & 3) == 0) &&
+            ((guschan->ramp_rate.h & 0x3F) > 0))    // if increment==0 then ramp is effectively no-op
+        {
+            // skip them entirely (until ramp emulation implemented)
+            if (guschan->volctrl.h & (1 << 6)) {
+                // ramp down
+                guschan->volume.w = guschan->ramp_start.w;
+            } else {
+                // ramp up
+                guschan->volume.w = guschan->ramp_end.w;
+            }
+            // request updating volume 
             flags |= GUSEMU_CHAN_UPDATE_VOLUME;
-        } else {
-            // ramp up
-            guschan->volume.w = guschan->ramp_end.w;
-            flags |= GUSEMU_CHAN_UPDATE_VOLUME;
+            // mark ramp as finished
+            guschan->volctrl.h |= 1;
         }
-        // mark ramp as finished
-        guschan->volctrl.h |= 1;
     }
+
+    // update volume
     if (flags & GUSEMU_CHAN_UPDATE_VOLUME) {
         emuchan->volume = gusemu_translate_volume(guschan->volume.w);
     }
@@ -481,13 +506,20 @@ void gusemu_update_channel(uint32_t ch, uint32_t flags) {
         if (guschan->ctrl.h & (1 << 3)) {
             // looped sample
             emuchan->flags &= ~EMUSTATE_CHAN_ONESHOT;
+            flags |= GUSEMU_CHAN_UPDATE_LOOPSTART;
         } else {
             // one-shot sample
             emuchan->flags |=  EMUSTATE_CHAN_ONESHOT;
+            flags |= GUSEMU_CHAN_UPDATE_LOOPSTART;
         }
         // update loop start if loop bit changed
-        if ((guschan->ctrl.h ^ guschan->ctrl_r.h) & (1 << 3))
-            flags |= GUSEMU_CHAN_UPDATE_LOOPSTART;
+        //if ((guschan->ctrl.h ^ guschan->ctrl_r.h) & (1 << 3))
+        //    flags |= GUSEMU_CHAN_UPDATE_LOOPSTART;
+
+        if (!(guschan->ctrl.h & 3) && (guschan->ctrl_r.h & 3))
+            flags |= GUSEMU_CHAN_UPDATE_START;
+        if ((guschan->ctrl.h & 3) && !(guschan->ctrl_r.h & 3))
+            flags |= GUSEMU_CHAN_UPDATE_STOP;
         
 #if 0
         // save play position on play->stop edge, but only if position is valid!
@@ -508,11 +540,12 @@ void gusemu_update_channel(uint32_t ch, uint32_t flags) {
             if (tempfreq <= 0x10040) tempfreq = 0xFFFF; else tempfreq = 0;
         }
         emuchan->freq = tempfreq;
-        
-        // update loop start for oneshot samples
-        if (emuchan->flags & EMUSTATE_CHAN_ONESHOT) {
-            flags |= GUSEMU_CHAN_UPDATE_LOOPSTART;
-        }
+    }
+
+    // update loop start for oneshot samples
+    if ((emuchan->flags & EMUSTATE_CHAN_ONESHOT) &&
+        (flags & (GUSEMU_CHAN_UPDATE_FREQ | GUSEMU_CHAN_UPDATE_LOOPEND))) {
+        flags |= GUSEMU_CHAN_UPDATE_LOOPSTART;
     }
 
     // here be dragons. and bugs. you know :)
@@ -522,10 +555,15 @@ void gusemu_update_channel(uint32_t ch, uint32_t flags) {
     uint32_t gusloopstart = (((uint32_t)guschan->start_high.w << 7) | (guschan->start_low.w >> 9)) & 0xFFFFF;
     uint32_t gusloopend   = (((uint32_t)guschan->end_high.w   << 7) | (guschan->end_low.w   >> 9)) & 0xFFFFF;
     bool     force_update = (emuchan->flags & EMUSTATE_CHAN_INVALID_POS);
+    bool     pos_is_valid = gusemu_validate_pos(guschanpos, gusloopstart, gusloopend, emuchan->freq, emuchan->flags);
 
     // validate them
-    if (gusemu_validate_pos(guschanpos, gusloopstart, gusloopend, emuchan->freq)) {
+    if (pos_is_valid) {
         // fine, update emu8k registers
+        if ((force_update) || (flags & GUSEMU_CHAN_UPDATE_LOOPEND)) {
+            emuchan->loopend = (gusemu_translate_pos(ch, gusloopend) - 1) & 0x00FFFFFF;
+            gusemu_write_loop_end(ch, emuchan->loopend);
+        }
         if ((force_update) || (flags & GUSEMU_CHAN_UPDATE_LOOPSTART)) {
             // fix for oneshot (non-looped) samples
             if (emuchan->flags & EMUSTATE_CHAN_ONESHOT) {
@@ -535,15 +573,11 @@ void gusemu_update_channel(uint32_t ch, uint32_t flags) {
             }
             gusemu_write_loop_start(ch, emuchan->loopstart);
         }
-        if ((force_update) || (flags & GUSEMU_CHAN_UPDATE_LOOPEND)) {
-            emuchan->loopend = (gusemu_translate_pos(ch, gusloopend) - 1) & 0x00FFFFFF;
-            gusemu_write_loop_end(ch, emuchan->loopend);
-        }
         if ((force_update) || (flags & GUSEMU_CHAN_UPDATE_POS)) {
             emuchan->pos = (gusemu_translate_pos(ch, guschanpos) - 1) & 0x00FFFFFF;
             gusemu_write_pos(ch, emuchan->pos);
         }
-        if ((force_update) || (flags & GUSEMU_CHAN_UPDATE_FREQ)) {
+        if ((force_update) || (flags & (GUSEMU_CHAN_UPDATE_FREQ | GUSEMU_CHAN_UPDATE_CTRL))) {
             // TODO: reverb?
             // process channel start/stop
             if (guschan->ctrl.w & 3) {
@@ -552,26 +586,29 @@ void gusemu_update_channel(uint32_t ch, uint32_t flags) {
             } else {
                 emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_PTRX, (emuchan->freq << 16) | 0);
             }
-            
         }
         if ((force_update) || (flags & GUSEMU_CHAN_UPDATE_VOLUME)) { 
-            emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_VTFT, (emuchan->volume << 16) | 0xFFFF);
+            if (gus_state.emuflags & GUSEMU_STATE_MUTED) {
+                emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_VTFT, 0 | 0xFFFF);
+            } else {
+                emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_VTFT, (emuchan->volume << 16) | 0xFFFF);
+            }
         }
-        // reset inavlid position flag
+        // reset invalid position flag
         emuchan->flags &= ~EMUSTATE_CHAN_INVALID_POS;
     } else if (!(emuchan->flags & EMUSTATE_CHAN_INVALID_POS)) {
         // invalid position!
-#if 1
+#if 0
         // save current position if it's not the cause of illegal pos
         if (!(flags & GUSEMU_CHAN_UPDATE_POS)) {
             uint32_t guspos = gusemu_get_current_pos(ch);
-            guschan->pos_high.w = guspos >> 7;
-            guschan->pos_low.w  = guspos << 9;
+            guschan->pos_high.w =  guspos >> 7;
+            guschan->pos_low.w  =  guspos << 9;
         }
+#endif
         // then mute and stop channel
         emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_PTRX, 0);
         emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_VTFT, 0x0000FFFF);   // leave filter always off
-#endif
         // mark channel as invalid position
         emuchan->flags |= EMUSTATE_CHAN_INVALID_POS;
     }
@@ -688,7 +725,7 @@ void gusemu_gf1_write(uint32_t reg, uint32_t ch, uint32_t data) {
                 update_flags |= GUSEMU_CHAN_UPDATE_PAN;
                 break;
             case 0x0D: // Volume Control
-                gus_state.gf1regs.chan[ch].volctrl.w = data & 0xFF00;
+                gus_state.gf1regs.chan[ch].volctrl.w = data & 0x7F00;
                 update_flags |= GUSEMU_CHAN_UPDATE_VOLCTRL;
                 break;
 

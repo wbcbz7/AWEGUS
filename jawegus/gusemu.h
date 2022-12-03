@@ -124,6 +124,10 @@ enum {
 
     // remove unnecessary delays
     GUSEMU_PATCH_DELAYS     = (1 << 10),
+
+    // -------------------
+    // gus is muted
+    GUSEMU_STATE_MUTED      = (1 << 31),
 };
 
 enum {
@@ -323,7 +327,7 @@ enum {
 
     // specical conditions
     GUSEMU_CHAN_UPDATE_START        = (1 << 11),
-    GUSEMU_CHAN_UPDATE_STOP         = (1 << 11),
+    GUSEMU_CHAN_UPDATE_STOP         = (1 << 12),
 };
 
 enum {
