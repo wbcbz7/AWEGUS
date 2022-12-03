@@ -2,3 +2,4 @@
 *.map
 *.obj 
 *.err
+*.exe
