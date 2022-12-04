@@ -60,7 +60,7 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
     
     // reset DRAM interface emulation
     gus_state.wordlatch.w = 0;
-    gus_state.dramreadpos = gus_state.dramwritepos = 0;
+    gus_state.dramwritepos = 0;
     emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALR, EMU8K_DRAM_OFFSET);
     emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, EMU8K_DRAM_OFFSET);
 
@@ -160,8 +160,9 @@ uint32_t gusemu_init(gusemu_init_t *init) {
     gus_state.mem8len   = init->memsize;
     if (gus_state.emuflags & GUSEMU_16BIT_SAMPLES) {
         gus_state.mem16start = EMU8K_DRAM_OFFSET + gus_state.mem8len;
-        gus_state.mem16len   = init->memsize / 2; // since we're merging 16bit writes
+        gus_state.mem16len   = init->memsize >> 1; // since we're merging 16bit writes
     }
+    gus_state.drammask = (gus_state.mem8len - 1);
 
     // done
     return 1;
@@ -306,8 +307,7 @@ void gusemu_process_output_enable() {
 // update DRAM pointers (unused?)
 void gusemu_update_dram_pointers() {
     // gus_state.gf1regs.dramhigh is 8bit register, and 8bit regs in GF1 are hibyte
-    gus_state.dramreadpos   = ((gus_state.gf1regs.dramhigh.h << 16) | (gus_state.gf1regs.dramlow.w)) & 0xFFFFF;
-    gus_state.dramwritepos  = gus_state.dramreadpos;
+    gus_state.dramwritepos  = ((gus_state.gf1regs.dramhigh.h << 16) | (gus_state.gf1regs.dramlow.w)) & 0xFFFFF;
 }
 
 // process timers, called for every emulation timer tick
@@ -925,29 +925,27 @@ uint32_t __trapcall gusemu_3x4_w16_trap(uint32_t port, uint32_t data, uint32_t f
 // DRAM read - read from 8bit sample pool solely
 uint32_t __trapcall gusemu_3x7_r8_trap (uint32_t port, uint32_t data, uint32_t flags) {
     uint32_t newreadpos = (gus_state.gf1regs.dramlow.w | (((uint32_t)gus_state.gf1regs.dramhigh.h) << 16));
+    if (newreadpos > gus_state.drammask) return 0;
 
-    // optimize for sequential reads
-    //if (gus_state.dramreadpos != newreadpos) {
-        gus_state.dramreadpos  = newreadpos;
-        emu8k_waitForWriteFlush(emu8k_state.iobase);    // TODO: flush only if last access was write
-        emu8k_waitForReadReady(emu8k_state.iobase); 
-        emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALR, EMU8K_DRAM_OFFSET + gus_state.dramreadpos);
-        emu8k_read (emu8k_state.iobase, EMU8K_REG_SMALD); // flush stale data!
-        emu8k_waitForReadReady(emu8k_state.iobase);
-    //}
+    emu8k_waitForWriteFlush(emu8k_state.iobase); // TODO: flush only if last access was write
+    emu8k_waitForReadReady(emu8k_state.iobase); 
+    emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALR, EMU8K_DRAM_OFFSET + newreadpos);
+    emu8k_waitForReadReady(emu8k_state.iobase);
+    emu8k_read (emu8k_state.iobase, EMU8K_REG_SMALD);
+    emu8k_waitForReadReady(emu8k_state.iobase);
     uint32_t rtn = (emu8k_read(emu8k_state.iobase, EMU8K_REG_SMALD) >> 8) & 0xFF;
-    gus_state.dramreadpos++;
     return rtn;
 }
 
 // TODO: emulate 16bit sample pool write
 uint32_t __trapcall gusemu_3x7_w8_trap (uint32_t port, uint32_t data, uint32_t flags) {
     uint32_t newwritepos = (gus_state.gf1regs.dramlow.w | (((uint32_t)gus_state.gf1regs.dramhigh.h) << 16));
+    if (newwritepos > gus_state.drammask) return 0;
 
     // optimize for sequential writes
-    //if (gus_state.dramwritepos != newwritepos) {
-        gus_state.dramwritepos  = newwritepos;
-        emu8k_waitForWriteFlush(emu8k_state.iobase);
+    emu8k_waitForWriteFlush(emu8k_state.iobase);
+    //if ((gusemu_cmdline.slowdram) || (gus_state.dramwritepos != newwritepos)) {
+        gus_state.dramwritepos = newwritepos;
         emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, EMU8K_DRAM_OFFSET + gus_state.dramwritepos);
     //}
     // convert to 16 bit

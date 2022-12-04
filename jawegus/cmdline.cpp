@@ -34,7 +34,7 @@ uint32_t parse_cmdline(char *cmdline, const cmdline_params_t *params, uint32_t p
                 p += tiny_strlen(cmd->longname);
                 break;
             }
-            if (*p == cmd->shortname) {
+            if ((cmd->shortname != '\0') && (*p == cmd->shortname)) {
                 p++; break;
             }
         }

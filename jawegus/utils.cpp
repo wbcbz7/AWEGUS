@@ -1,6 +1,12 @@
 #include "utils.h"
 
-// a couple of string functions
+// round down to power of two
+int roundDownPot(uint32_t a) {
+    if (a == 0) return 0;
+    int c = 0;
+    while ((a >>= 1) != 0) c++;
+    return (1 << c);
+}
 
 // get environment block (list of ASCIIZ strings)
 const char* getenvblock() {

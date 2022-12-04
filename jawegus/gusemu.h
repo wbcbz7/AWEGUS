@@ -218,8 +218,11 @@ struct gus_state_t {
     // --------------------------------
     // helper stuff
 
-    // last DRAM read/write pointer
-    uint32_t dramreadpos, dramwritepos;
+    // last DRAM write pointer (read are always uncached)
+    uint32_t dramwritepos;
+
+    // DRAM address mask
+    uint32_t drammask;
 
     // memory pools start
     uint32_t mem8start,  mem8len;

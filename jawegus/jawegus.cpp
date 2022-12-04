@@ -47,6 +47,7 @@ cmdline_params_t cmdline_params[] = {
     {'S', CMD_FLAG_BOOL,    "SLOWDRAM", &gusemu_cmdline.slowdram, 0},
     {'M', CMD_FLAG_BOOL,    "MONO",     &gusemu_cmdline.mono, 0},
     {'W', CMD_FLAG_BOOL,    "16BIT",    &gusemu_cmdline.en16bit, 0},
+    {0,   CMD_FLAG_INT,     "MEM",      &cmdflags.dramsize, 0},
 };
 
 // --------------
@@ -61,7 +62,7 @@ void showHelp() {
         " -?, -h, --help   - this help\r\n"
         " -w, --16bit      - enable 16bit samples (needs 1.5x more DRAM, slower upload)\r\n"
         " -m, --mono       - force mono panning\r\n"
-        " -s, --slowdram   - use EMU8000 ch28-29 only for DRAM interface\r\n"
+        " -s, --slowdram   - disable DRAM write position autoincrement\r\n"
         "     --mem=[x]    - limit emulated GUS DRAM to x kbytes\r\n"
         "\r\n"
     );
@@ -142,22 +143,33 @@ int install(char *cmdline) {
     }
     printf("EMU8000 found at base %X, ", init_data.emubase);
 
-    // check memory amount
-    init_data.memsize = emu8k_getMemSize(init_data.emubase);
-    printf("DRAM size: %d KB\r\n", init_data.memsize >> 9);
-    if (init_data.memsize < 768*1024) {  // safe margin
+    // check memory amount and determine GUS emulated memory size
+    uint32_t memsize = emu8k_getMemSize(init_data.emubase);
+    printf("DRAM size: %d KB\r\n", memsize >> 9);
+    if (memsize < 768*1024) {  // safe margin
         puts("error: you must have at least 2048 K of sound DRAM installed to run AWEGUS\r\n");
         return 0;
     }
+    if ((cmdflags.dramsize != 0) && ((cmdflags.dramsize << 10) <= memsize))
+        init_data.memsize = cmdflags.dramsize << 10;
+    else 
+        init_data.memsize = memsize;
+    if (gusemu_cmdline.en16bit) init_data.memsize = (init_data.memsize * 2) / 3;
+    if (init_data.memsize >= 1024*1024) init_data.memsize = 1024*1024;
+    init_data.memsize = roundDownPot(init_data.memsize);
 
-    // calculate effective memory size
-    init_data.memsize = init_data.memsize;        // TODO: 16bit support fixup
+    if (init_data.memsize < 256*1024) {
+        printf("error: insufficient memory to handle GUS emulation!\r\n");
+        return 0;
+    }
 
     // init emulation
     if (gusemu_init(&init_data) == 0) {
         puts("error: unable to initialize GUS emulation\r\n");
         return 0;
-    } else printf("GUS emulation at port %X installed\r\n", init_data.gusbase);
+    } else
+        printf("GUS emulation at port %X installed, %d KB DRAM available\r\n",
+                init_data.gusbase, init_data.memsize >> 10);
 
     return 1;
 }
@@ -173,8 +185,8 @@ int uninstall() {
 
 int __stdcall DllMain(int module, int reason, struct jlcomm *jlcomm) {
     puts(
-        "AWEGUS - Gravis Ultrasound emulator for AWE32/64, Jemm-based, v.0.11\r\n"
-        "by wbcbz7 o3.12.2o22\r\n"
+        "AWEGUS - Gravis Ultrasound emulator for AWE32/64, Jemm-based, v.0.12\r\n"
+        "by wbcbz7 o5.12.2o22\r\n"
     );
     if (reason == DLL_PROCESS_ATTACH) {
         return install(jlcomm->cmd_line);

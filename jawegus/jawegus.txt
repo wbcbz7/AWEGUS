@@ -1,6 +1,6 @@
 ﻿alright, here is some hardcore shit
 
-   AWEGUS - Gravis Ultrasound "emulator" for Sound Blaster AWE32/64 v.0.11
+   AWEGUS - Gravis Ultrasound "emulator" for Sound Blaster AWE32/64 v.0.12
             absolutely copyleft (cl) 2o22 Artem Vasilev - wbcbz7
 
  1. wtf?
@@ -116,7 +116,6 @@
       BPAWEGUS.EXE -U                           // i/o breakpoint version
 
     oh, and by the way, both SB16 and FM parts will still work alongside
-    (FM part may be silent due to the way GUS mute is handled)
 
  5. command line switches
     -?, -h, --help 
@@ -128,11 +127,10 @@
     -m, --mono  
         - force mono panning
     -s, --slowdram 
-        - make EMU8000 use only channels 28 and 29 for DRAM access
-          intended to fix sample corruption issues but i managed to fix it :)
-          not recommended for now
+        - disable DRAM write position auto increment
+          for now has no effect, as DRAM autoincrement is disabled anyway
     --mem=[x]
-        - limit emulated GUS ram size to xkb (TO BE IMPLEMENTED)
+        - limit GUS ram size to x kb, rounded down to nearest power of two
  
  6. more stuff
     right now seems to work well with apps using GusPlay by Cascada, other

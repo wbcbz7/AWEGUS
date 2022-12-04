@@ -6,6 +6,9 @@
 // "debug" watchpoint using palette :)
 #define RASTER(r, g, b) {outp(0x3c8, 0);outp(0x3c9, (r));outp(0x3c9, (g));outp(0x3c9, (b));}
 
+// round down to power of two
+int roundDownPot(uint32_t a);
+
 // get environment block (list of ASCIIZ strings)
 const char* getenvblock();
 
