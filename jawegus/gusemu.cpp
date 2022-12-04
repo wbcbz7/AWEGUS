@@ -68,7 +68,8 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
     gus_state.mixctrl    = 0x03;                // mixctrl, 2x0
     gus_state.timerindex = 0;                   // timer index, 2x8
     gus_state.timerdata  = 0;                   // timer data,  2x9
-    gus_state.gf1regs.active_channels = 0xCD;   // 14 active channels
+    gus_state.gf1regs.active_channels   = 0xCD; // 14 active channels
+    emu8k_state.active_channels         = GUSEMU_MAX_EMULATED_CHANNELS; // to trigger all channels update
 
     // reset GF1 registers
     gus_state.pagereg.w             = 0;
@@ -105,6 +106,14 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
         gus_state.gf1regs.chan[ch].pan.w        = 0x0700;   // 0C: pan
         */
         gus_state.gf1regs.chan[ch].volctrl.w    = 0x0100;   // 0D: ramp  control
+    }
+
+    // stop emu8k channels
+    for (int ch = 0; ch < GUSEMU_MAX_EMULATED_CHANNELS; ch++) {
+        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_PTRX, 0x00000000);
+        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CPF,  0x00000000);
+        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_VTFT, 0x0000FFFF);
+        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CVCF, 0x0000FFFF);
     }
 
     // reinit active channels
@@ -229,12 +238,26 @@ uint32_t gusemu_translate_pos(uint32_t ch, uint32_t pos) {
 
 // update active channels count
 void gusemu_update_active_channel_count() {
-    uint32_t chans = (gus_state.gf1regs.active_channels & 31) + 1;
-    if (chans <= GUSEMU_MAX_EMULATED_CHANNELS) chans = GUSEMU_MAX_EMULATED_CHANNELS;
-    emu8k_state.active_channels = chans;
+    uint32_t oldchans = emu8k_state.active_channels;
+    uint32_t newchans = (gus_state.gf1regs.active_channels & 31) + 1;
+    
+    // clamp
+    if (newchans < 14) newchans = 14;
+    if (newchans > GUSEMU_MAX_EMULATED_CHANNELS) newchans = GUSEMU_MAX_EMULATED_CHANNELS;
 
     // reinit emu8k dram interface
-    emu8k_dramEnable(emu8k_state.iobase, true, chans);
+    if (newchans > oldchans) for (int ch = oldchans; ch < newchans; ch++) {
+        // stop, mute and deallocate channel
+        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_PTRX, 0x00000000);
+        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CPF,  0x00000000);
+        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CCCA, 0);
+        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_VTFT, 0x0000FFFF);
+        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CVCF, 0x0000FFFF);
+    }
+    emu8k_dramEnable(emu8k_state.iobase, true, newchans);
+
+    // save new active channels count
+    emu8k_state.active_channels = newchans;
 }
 
 // get and translate current playing position
@@ -739,6 +762,7 @@ void gusemu_gf1_write(uint32_t reg, uint32_t ch, uint32_t data) {
 
     if (reg == 0x0E) { // Active Voices (Voice independent)
         gus_state.gf1regs.active_channels = data >> 8;
+        gusemu_update_active_channel_count();
     }
 }
 
