@@ -27,6 +27,7 @@ struct gusemu_init_t {
 
 // gusemu command line flags
 struct gusemu_cmdline_t {
+    bool    mono;           // force mono panning
     bool    slowdram;       // use ch28-29 only for DRAM access (slooww)
     bool    en16bit;        // enable 16bit samples
 };

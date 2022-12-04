@@ -54,8 +54,8 @@ uint32_t parse_cmdline(char *cmdline, const cmdline_params_t *params, uint32_t p
         // finally extract value
         switch(cmd->flags & CMD_FLAG_MASK) {
             case CMD_FLAG_BOOL:
-                if (tiny_strstr(p, "OFF") || (*p == '0')) *(uint32_t*)cmd->parmPtr = 0;
-                else /* if (tiny_strstr(p, "ON") || (*p == '1')) */ *(uint32_t*)cmd->parmPtr = 1;
+                if (tiny_strstr(p, "OFF") || (*p == '0') || (*p == '-')) *(uint32_t*)cmd->parmPtr = 0;
+                else /* if (tiny_strstr(p, "ON") || (*p == '1'))*/ *(uint32_t*)cmd->parmPtr = 1;
                 break;
             case CMD_FLAG_INT:
                 if (tiny_strtol_store(p, 0, (long*)cmd->parmPtr, 10) == false) {

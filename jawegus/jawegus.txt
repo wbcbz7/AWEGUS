@@ -1,6 +1,6 @@
 ﻿alright, here is some hardcore shit
 
-   AWEGUS - Gravis Ultrasound "emulator" for Sound Blaster AWE32/64 v.0.1
+   AWEGUS - Gravis Ultrasound "emulator" for Sound Blaster AWE32/64 v.0.11
             absolutely copyleft (cl) 2o22 Artem Vasilev - wbcbz7
 
  1. wtf?
@@ -84,7 +84,8 @@
  4. usage
   a. set your BLASTER and ULTRASND environment variables, example:
       SET BLASTER=A220 I5 D1 H5 E620 P330
-                                ^^^^ EMU8000 base - required!
+                  ^^^^ ^^ ^^    ^^^^ EMU8000 base - required!
+                  ^^^^ ^^ ^^ SB16 resources - can be used for IRQ emulation
       SET ULTRASND=240,3,3,7,7
                     ^  ^   ^ emulated IRQ
                     ^   emulated DMA channel
@@ -118,7 +119,20 @@
     (FM part may be silent due to the way GUS mute is handled)
 
  5. command line switches
-    coming soon
+    -?, -h, --help 
+        - show help screen
+    -w, --16bit
+        - enable 16bit samples support (TO BE IMPLEMENTED)
+          note it requires 1.5x more sound RAM, so 4 MB or more is recommended
+          will work on 2 MB, but GUS RAM size is limited to 512 kB
+    -m, --mono  
+        - force mono panning
+    -s, --slowdram 
+        - make EMU8000 use only channels 28 and 29 for DRAM access
+          intended to fix sample corruption issues but i managed to fix it :)
+          not recommended for now
+    --mem=[x]
+        - limit emulated GUS ram size to xkb (TO BE IMPLEMENTED)
  
  6. more stuff
     right now seems to work well with apps using GusPlay by Cascada, other

@@ -45,6 +45,7 @@ cmdline_params_t cmdline_params[] = {
     {'?', CMD_FLAG_BOOL,    "HELP",     &cmdflags.help, 0},
     {'H', CMD_FLAG_BOOL,    "HELP",     &cmdflags.help, 0},
     {'S', CMD_FLAG_BOOL,    "SLOWDRAM", &gusemu_cmdline.slowdram, 0},
+    {'M', CMD_FLAG_BOOL,    "MONO",     &gusemu_cmdline.mono, 0},
     {'W', CMD_FLAG_BOOL,    "16BIT",    &gusemu_cmdline.en16bit, 0},
 };
 
@@ -59,8 +60,9 @@ void showHelp() {
         "\r\n"
         " -?, -h, --help   - this help\r\n"
         " -w, --16bit      - enable 16bit samples (needs 1.5x more DRAM, slower upload)\r\n"
+        " -m, --mono       - force mono panning\r\n"
         " -s, --slowdram   - use EMU8000 ch28-29 only for DRAM interface\r\n"
-        " -m=[x] --mem=[x] - limit emulated GUS DRAM to x kbytes\r\n"
+        "     --mem=[x]    - limit emulated GUS DRAM to x kbytes\r\n"
         "\r\n"
     );
 }
@@ -171,7 +173,7 @@ int uninstall() {
 
 int __stdcall DllMain(int module, int reason, struct jlcomm *jlcomm) {
     puts(
-        "AWEGUS - Gravis Ultrasound emulator for AWE32/64, Jemm-based, v.0.1\r\n"
+        "AWEGUS - Gravis Ultrasound emulator for AWE32/64, Jemm-based, v.0.11\r\n"
         "by wbcbz7 o3.12.2o22\r\n"
     );
     if (reason == DLL_PROCESS_ATTACH) {

@@ -23,8 +23,8 @@ there are lots of bugs :D
 
 * GUSPlay applications almost always work fine, with minor whining if samples are not looped properly
 * Impulse Tracker - one-shot samples are cut after first tick, volume bars are broken
-* Scream Tracker 3.x, Second Reality, Unreal/Future Crew (version 1.1 with GUS support) - corrupted samples at 2nd and further module load
-  * ST3: load AWEGUS, run ST3, then load any module - plays fine; then, exit from the tracker, run ST3 again - can't detect GUS. running ULTRINIT then running ST3 again didn't help
+* Scream Tracker 3.x, Second Reality, Unreal/Future Crew (version 1.1 with GUS support) - ~~corrupted samples at 2nd and further module load~~ fine except for minor ultraclick bugs (see below)
+  * ~~ST3: load AWEGUS, run ST3, then load any module - plays fine; then, exit from the tracker, run ST3 again - can't detect GUS. running ULTRINIT then running ST3 again didn't help~~
   * upd: ST3 - managed to fix sample corruption but now some channels play wrong samples (some are at +1 octave). must have something with "ultraclick removal" feature?
 * [So Be It/Xtacy](https://www.pouet.net/prod.php?which=1025) - uploads samples always on 0x220 but controls GF1 playback on user selected port. also crashes with reset on phong part:
   * from [pouet comment](https://www.pouet.net/prod.php?post=845293): *Crashes in DOSBox (all builds so far) at the "phong environment mapping" part due to corrupt MCB chain. Works all the way in PCem at 486/66, but without music (seems to want the GUS at 220/7/1, while PCem forces 240/5/3).*

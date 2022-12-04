@@ -216,7 +216,7 @@ uint32_t gusemu_translate_pitch(uint32_t gf1pitch) {
 // transate gf1->emu8k volume, gf1vol in 4.12 format
 uint32_t gusemu_translate_volume(uint32_t gf1vol) {
     // this one if pretty straightforward, note extra precision
-    return ((4096 + (gf1vol & 0xFFF)) << (gf1vol >> 12)) >> 12; // ugh
+    return (gf1vol == 0) ? 0 : ((4096 + (gf1vol & 0xFFF)) << (gf1vol >> 12)) >> 12; // ugh
 }
 
 // set and translate position
@@ -499,7 +499,7 @@ void gusemu_update_channel(uint32_t ch, uint32_t flags) {
     if (flags & GUSEMU_CHAN_UPDATE_PAN) {
         // convert panning from 0..F to 0..FF range
         uint32_t pan = (15 - (guschan->pan.h & 0x0F));
-        pan = (pan | (pan << 4));
+        pan = gusemu_cmdline.mono ? 0x80 : (pan | (pan << 4));
         emuchan->pan = pan;
     }
 
