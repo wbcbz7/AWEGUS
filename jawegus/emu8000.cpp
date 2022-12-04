@@ -52,7 +52,16 @@ void emu8k_dramEnable(uint32_t iobase, bool readWrite, uint32_t startChannel) {
 int emu8k_waitForWriteFlush(uint32_t iobase) {
     uint32_t timeout = (1 << 12);    // ~3ms on ISA 8.33Mhz
     outpw(iobase + 0x802, EMU8K_REG_SMALW & 0xFF); 
-    while ((--timeout != 0) && (inpw(iobase + 0x402) & 0x8000));
+    while ((--timeout != 0) && ((inpd(iobase + 0x400) & (1 << 31)) != 0));
+    
+    return (timeout != 0);
+}
+
+// 0 if timeout, non-0 if done
+int emu8k_waitForReadReady(uint32_t iobase) {
+    uint32_t timeout = (1 << 12);    // ~3ms on ISA 8.33Mhz
+    outpw(iobase + 0x802, EMU8K_REG_SMALR & 0xFF); 
+    while ((--timeout != 0) && ((inpd(iobase + 0x400) & (1 << 31)) != 0));
     
     return (timeout != 0);
 }
@@ -180,8 +189,8 @@ int emu8k_initChannels(uint32_t iobase, uint32_t channels, uint32_t startChannel
         }
 
         // init sound generator
-        //emu8k_write(iobase, ch + EMU8K_REG_PTRX,     0x00000000);
-        //emu8k_write(iobase, ch + EMU8K_REG_VTFT,     0x0000FFFF);
+        emu8k_write(iobase, ch + EMU8K_REG_PTRX,     0x00000000);
+        emu8k_write(iobase, ch + EMU8K_REG_VTFT,     0x0000FFFF);
         //emu8k_write(iobase, ch + EMU8K_REG_PSST,     0x00000000);
         //emu8k_write(iobase, ch + EMU8K_REG_CSL,      0x00000000);
         //emu8k_write(iobase, ch + EMU8K_REG_CCCA,     0x00000000);

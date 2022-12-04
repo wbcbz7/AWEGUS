@@ -7,6 +7,7 @@
 #include "iotrap.h"
 #include "gusemu.h"
 #include "emu8000.h"
+#include "cmdline.h"
 
 extern "C" struct vxd_desc_block ddb = {
     0,  /* Next */
@@ -33,7 +34,37 @@ extern "C" struct vxd_desc_block ddb = {
 // gusemu init structure
 gusemu_init_t init_data;
 
+// global command line info
+struct {
+    bool     help;
+    uint32_t dramsize;
+} cmdflags;
+
+// command line info
+cmdline_params_t cmdline_params[] = {
+    {'?', CMD_FLAG_BOOL,    "HELP",     &cmdflags.help, 0},
+    {'H', CMD_FLAG_BOOL,    "HELP",     &cmdflags.help, 0},
+    {'S', CMD_FLAG_BOOL,    "SLOWDRAM", &gusemu_cmdline.slowdram, 0},
+    {'W', CMD_FLAG_BOOL,    "16BIT",    &gusemu_cmdline.en16bit, 0},
+};
+
 // --------------
+
+// show help
+void showHelp() {
+    puts(
+        "help:\r\n"
+        " usage: JLOAD JAWEGUS.EXE [params...]\r\n"
+        " parameters:\r\n"
+        "\r\n"
+        " -?, -h, --help   - this help\r\n"
+        " -w, --16bit      - enable 16bit samples (needs 1.5x more DRAM, slower upload)\r\n"
+        " -s, --slowdram   - use EMU8000 ch28-29 only for DRAM interface\r\n"
+        " -m=[x] --mem=[x] - limit emulated GUS DRAM to x kbytes\r\n"
+        "\r\n"
+    );
+}
+
 // scan environment
 bool get_environment_values() {
     char temp[128];
@@ -87,11 +118,20 @@ bool get_environment_values() {
 int install(char *cmdline) {
     // init structure
     tiny_memset(&init_data, 0, sizeof(init_data));
+    tiny_memset(&cmdflags, 0, sizeof(cmdflags));
+    tiny_memset(&gusemu_cmdline, 0, sizeof(gusemu_cmdline));
+
+    // parse command line
+    if (parse_cmdline(cmdline, cmdline_params, sizeof(cmdline_params)/sizeof(cmdline_params[0])) != 0)
+        return 0; 
+
+    if (cmdflags.help){
+        showHelp();
+        return 0;
+    }
 
     // get environment variables
     if (get_environment_values() == false) return 0;
-
-    // TODO: parse command line!
 
     // probe for EMU8000
     if (emu8k_probe(init_data.emubase) == 0) {

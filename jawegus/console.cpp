@@ -70,6 +70,22 @@ const char* puts(const char *str) {
     return str;
 }
 
+bool istrim(char ch) {
+    return ((ch == '\xFF') || (ch == ' ') || (ch == '\t') || (ch == '\r') || (ch == '\n'));
+}
+
+char *tiny_rtrim(char *str) {
+    char *p = str + tiny_strlen(str) - 1;
+    while (istrim(*p)) *p-- = '\0';
+    return str;
+}
+
+char *tiny_ltrim(char *str) {
+    char *p = str;
+    while (istrim(*p) && (*p != '\0')) p++;
+    return p;
+}
+
 char tiny_toupper(char c) {
     return ((c >= 'a') && (c <= 'z')) ? c - ('a' - 'A') : c;
 }

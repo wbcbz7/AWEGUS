@@ -11,16 +11,17 @@
 // INTERNAL STATIC GUSEMU STRUCTURES (beware!)
 gus_state_t gus_state;
 gus_emu8k_state_t emu8k_state;
+gusemu_cmdline_t gusemu_cmdline;
 
 // do everything here. really
 
 void gusemu_emu8k_reset() {
     // reset EMU8000
     //emu8k_hwinit(emu8k_state.iobase);
-    emu8k_dramEnable(emu8k_state.iobase, true);
-    emu8k_initChannels(emu8k_state.iobase, 14);
+    emu8k_initChannels(emu8k_state.iobase, GUSEMU_MAX_EMULATED_CHANNELS);
+    emu8k_dramEnable(emu8k_state.iobase, true, (gusemu_cmdline.slowdram ? GUSEMU_MAX_EMULATED_CHANNELS : 0));
     emu8k_setFlatEq(emu8k_state.iobase);
-    //emu8k_disableOutput(emu8k_state.iobase);      // keep it enabled for FM passthru
+    // reset DRAM pointers
     emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALR, EMU8K_DRAM_OFFSET);
     emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, EMU8K_DRAM_OFFSET);
 }
@@ -246,15 +247,23 @@ void gusemu_update_active_channel_count() {
     if (newchans > GUSEMU_MAX_EMULATED_CHANNELS) newchans = GUSEMU_MAX_EMULATED_CHANNELS;
 
     // reinit emu8k dram interface
-    if (newchans > oldchans) for (int ch = oldchans; ch < newchans; ch++) {
-        // stop, mute and deallocate channel
-        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_PTRX, 0x00000000);
-        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CPF,  0x00000000);
-        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CCCA, 0);
-        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_VTFT, 0x0000FFFF);
-        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CVCF, 0x0000FFFF);
+    if (gusemu_cmdline.slowdram == false) {
+        // wait for pending write flush
+        emu8k_waitForWriteFlush(emu8k_state.iobase);
+        if (newchans > oldchans) for (int ch = oldchans; ch < newchans; ch++) {
+            // stop, mute and deallocate channel
+            emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_PTRX, 0x00000000);
+            emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CPF,  0x00000000);
+            emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CCCA, 0);
+            emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_VTFT, 0x0000FFFF);
+            emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CVCF, 0x0000FFFF);
+            emu8k_state.chan[ch].flags |= EMUSTATE_CHAN_INVALID_POS;
+        }
+        emu8k_dramEnable(emu8k_state.iobase, true, newchans);
+        for (int ch = newchans; ch < 32; ch++) {
+            emu8k_state.chan[ch].flags |= EMUSTATE_CHAN_INVALID_POS;
+        }
     }
-    emu8k_dramEnable(emu8k_state.iobase, true, newchans);
 
     // save new active channels count
     emu8k_state.active_channels = newchans;
@@ -483,10 +492,6 @@ void gusemu_write_loop_end(uint32_t ch, uint32_t pos) {
 // alright, now to the very core of emulation
 // update channel state
 void gusemu_update_channel(uint32_t ch, uint32_t flags) {
-    // channels 28-31 are not supported for now and silently ignored
-    // also do not let emulation to tamper with dram-assigned channels
-    if (ch >= emu8k_state.active_channels) return; 
-
     gus_emu8k_state_t::emu8k_chan_t *emuchan = &emu8k_state.chan[ch];
     gf1regs_channel_t *guschan = &gus_state.gf1regs.chan[ch];
 
@@ -570,6 +575,10 @@ void gusemu_update_channel(uint32_t ch, uint32_t flags) {
         (flags & (GUSEMU_CHAN_UPDATE_FREQ | GUSEMU_CHAN_UPDATE_LOOPEND))) {
         flags |= GUSEMU_CHAN_UPDATE_LOOPSTART;
     }
+
+    // stop here if channel is above the limit
+    // also do not let emulation to tamper with dram-assigned channels
+    if (ch >= emu8k_state.active_channels) return; 
 
     // here be dragons. and bugs. you know :)
     // ---------------------
@@ -920,8 +929,11 @@ uint32_t __trapcall gusemu_3x7_r8_trap (uint32_t port, uint32_t data, uint32_t f
     // optimize for sequential reads
     //if (gus_state.dramreadpos != newreadpos) {
         gus_state.dramreadpos  = newreadpos;
+        emu8k_waitForWriteFlush(emu8k_state.iobase);    // TODO: flush only if last access was write
+        emu8k_waitForReadReady(emu8k_state.iobase); 
         emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALR, EMU8K_DRAM_OFFSET + gus_state.dramreadpos);
         emu8k_read (emu8k_state.iobase, EMU8K_REG_SMALD); // flush stale data!
+        emu8k_waitForReadReady(emu8k_state.iobase);
     //}
     uint32_t rtn = (emu8k_read(emu8k_state.iobase, EMU8K_REG_SMALD) >> 8) & 0xFF;
     gus_state.dramreadpos++;
@@ -935,6 +947,7 @@ uint32_t __trapcall gusemu_3x7_w8_trap (uint32_t port, uint32_t data, uint32_t f
     // optimize for sequential writes
     //if (gus_state.dramwritepos != newwritepos) {
         gus_state.dramwritepos  = newwritepos;
+        emu8k_waitForWriteFlush(emu8k_state.iobase);
         emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, EMU8K_DRAM_OFFSET + gus_state.dramwritepos);
     //}
     // convert to 16 bit

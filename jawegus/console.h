@@ -25,5 +25,7 @@ uint32_t tiny_strlen(const char* str);
 char* tiny_strncpy(char* dst, const char* str, uint32_t dst_size);
 char* tiny_strtok(char* start, const char* delim, char** end);
 const char* tiny_strstr(const char* first, const char* second);
+char *tiny_rtrim(char *str);
+char *tiny_ltrim(char *str);
 
 #define printf(...) npf_pprintf(putchar_printf, 0, __VA_ARGS__)

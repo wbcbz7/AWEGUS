@@ -8,6 +8,16 @@ uint32_t parse_cmdline(char *cmdline, const cmdline_params_t *params, uint32_t p
     char *arg = cmdline, *argnext = 0;
     int argc = 1;
 
+    // trim \r, \n and spaces
+    tiny_rtrim(cmdline);
+    tiny_ltrim(cmdline);
+
+#if 0
+    char *s = cmdline;
+    while (*s != '\0') printf("%02X ", *s++);
+    printf("\r\ncommand line: %s (%d chars)\r\n", cmdline, tiny_strlen(cmdline));
+#endif
+
     while (((arg = tiny_strtok(arg, " ", &argnext)) != 0)) {
         // copy to temp buffer and uppercase it
         tiny_strncpy(parm, arg, sizeof(parm)); tiny_strupr(parm);
@@ -18,7 +28,8 @@ uint32_t parse_cmdline(char *cmdline, const cmdline_params_t *params, uint32_t p
 
         // get best matching option
         const cmdline_params_t* cmd = params; char* nextp = p;
-        for (int j = 0; j < paramCount; j++, cmd++) {
+        int curParm = 0;
+        for (curParm = 0; curParm < paramCount; curParm++, cmd++) {
             if ((cmd->longname != NULL) && (tiny_strstr(p, cmd->longname) != NULL)) {
                 p += tiny_strlen(cmd->longname);
                 break;
@@ -27,8 +38,8 @@ uint32_t parse_cmdline(char *cmdline, const cmdline_params_t *params, uint32_t p
                 p++; break;
             }
         }
-        if (cmd->parmPtr == NULL) {
-            printf("error: unknown parameter: %s\n", parm);
+        if (curParm >= paramCount) {
+            printf("error: unknown parameter: %s\r\n", parm);
             return 1;
         }
 
@@ -48,13 +59,13 @@ uint32_t parse_cmdline(char *cmdline, const cmdline_params_t *params, uint32_t p
                 break;
             case CMD_FLAG_INT:
                 if (tiny_strtol_store(p, 0, (long*)cmd->parmPtr, 10) == false) {
-                    printf("error: incorrect parameter: %s\n", p);
+                    printf("error: incorrect parameter: %s\r\n", p);
                     return 1;
                 }
                 break;
             case CMD_FLAG_HEX:
                 if (tiny_strtol_store(p, 0, (long*)cmd->parmPtr, 16) == false) {
-                    printf("error: incorrect parameter: %s\n", p);
+                    printf("error: incorrect parameter: %s\r\n", p);
                     return 1;
                 }
                 break;
@@ -62,7 +73,7 @@ uint32_t parse_cmdline(char *cmdline, const cmdline_params_t *params, uint32_t p
                 tiny_strncpy((char*)cmd->parmPtr, p, cmd->parmLength);
                 break;
             default:
-                printf("error: undefined parameter type %d for %c(\"%s\")!\n", cmd->flags, cmd->shortname, cmd->longname);
+                printf("error: undefined parameter type %d for %c(\"%s\")!\r\n", cmd->flags, cmd->shortname, cmd->longname);
                 return 1;
         }
 

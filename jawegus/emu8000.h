@@ -7,6 +7,7 @@ uint32_t emu8k_read(uint32_t iobase, uint32_t reg);
 void emu8k_delay(uint32_t iobase, uint32_t samples);
 void emu8k_dramEnable(uint32_t iobase, bool readWrite, uint32_t startChannel = 0);
 int emu8k_waitForWriteFlush(uint32_t iobase);
+int emu8k_waitForReadReady(uint32_t iobase);
 int emu8k_probe(uint32_t iobase);
 uint32_t emu8k_getMemSize(uint32_t iobase);
 void emu8k_uploadSample(uint32_t iobase, uint32_t start, int16_t* data, uint32_t samples);

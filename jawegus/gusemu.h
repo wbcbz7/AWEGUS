@@ -25,6 +25,12 @@ struct gusemu_init_t {
 };
 #pragma pack(pop)
 
+// gusemu command line flags
+struct gusemu_cmdline_t {
+    bool    slowdram;       // use ch28-29 only for DRAM access (slooww)
+    bool    en16bit;        // enable 16bit samples
+};
+
 // gus emulation structures
 
 // shadow GF1 registers. note all are 16 bit
@@ -252,7 +258,7 @@ struct gus_emu8k_state_t {
 // externs!
 extern gus_state_t gus_state;
 extern gus_emu8k_state_t emu8k_state;
-
+extern gusemu_cmdline_t gusemu_cmdline;
 
 // reset emulated gus state
 uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg);
