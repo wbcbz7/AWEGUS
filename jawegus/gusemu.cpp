@@ -978,7 +978,6 @@ uint32_t __trapcall gusemu_3x7_w8_trap_16bit(uint32_t port, uint32_t data, uint3
     emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, gus_state.mem8start + newwritepos);
     emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALD, data << 8);
 
-#if 1
     // test if 16bit sample
     if ((gus_state.wordlatch_active) && (gus_state.dramwritepos == (newwritepos - 1))) {
         // fill high byte
@@ -996,7 +995,6 @@ uint32_t __trapcall gusemu_3x7_w8_trap_16bit(uint32_t port, uint32_t data, uint3
     } else {
         gus_state.wordlatch_active = 0;
     }
-#endif
 
     // save dram write position
     gus_state.dramwritepos = newwritepos;

@@ -11,7 +11,7 @@
 
  common:
   - classic GUS (GF1) wavetable feature set only
-  - 8 bit samples only (16bit support coming soon)
+  - 8/16bit samples support (default is 8bit only to save sound RAM, see below)
   - forward loops are supported, one-shots are emulated as tiny 1-sample loop
     (may cause high pitched noise). backward playback and rollover are not
     supported, ping-pong loops are treated as forward.
@@ -121,7 +121,7 @@
     -?, -h, --help 
         - show help screen
     -w, --16bit
-        - enable 16bit samples support (TO BE IMPLEMENTED)
+        - enable 16bit samples support
           note it requires 1.5x more sound RAM, so 4 MB or more is recommended
           will work on 2 MB, but GUS RAM size is limited to 512 kB
           also needs to upload each sample twice, increasing uploading time
