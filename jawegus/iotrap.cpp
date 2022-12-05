@@ -101,6 +101,9 @@ void* getIOHandler(uint32_t port, uint32_t type) {
 }
 
 uint32_t iotrap_install(uint32_t iobase) {
+    // patch dispatch table for 16bit samples support
+    if (gusemu_cmdline.en16bit) dispatchTable[0x30 + 7] = &gusemu_3x7_w8_trap_16bit; 
+
     for (int i = 0; trappedPorts[i] != 0xFFFF; i++) {
         if (Install_IO_Handler(iobase + trappedPorts[i] - 0x200, &IOTrapEntry) != 0) goto _fail;
     }

@@ -151,7 +151,7 @@
       x = 0: SB16 in dummy playback mode
         speaks of itself :) play silent 8bit sample over and over at 5kHz
         uses regular SB port, IRQ and DMA resources from BLASTER variable
-        of course, you're not able to use SB16 mode in DOS applications then.
+        of course, you're not able to use SB16 in DOS applications then.
       x = 1,2 : use COM1/COM2 as timing source
         abuse 8250 UART to send null character at arbitrary baud rate, and
         use transmit buffer empty IRQ as timing source. may not work in some
@@ -169,10 +169,12 @@
  7. DMA emulation (TO BE IMPLEMENTED)
     alas, Jemm doesn't provide DMA virtualization API either, so DMA emulation
     is done by monitoring GF1 DMA control registers. if DMA transfer is started,
-    read 8237 and DMA page registers to determine buffer address and count.
+    read 8237 and DMA page registers to determine buffer address and size.
     then, simply copy data to EMU8000 DRAM and signal DMA completion (and 
     optionally an IRQ). simple yet enough for most GUS players.
     circular biffer playback will not work.
+
+    NB: only 8bit DMA channels are emulated!
 
  7. more stuff
     right now seems to work well with apps using GusPlay by Cascada, other

@@ -60,6 +60,7 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
     
     // reset DRAM interface emulation
     gus_state.wordlatch.w = 0;
+    gus_state.wordlatch_active = 0;
     gus_state.dramwritepos = 0;
     emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALR, EMU8K_DRAM_OFFSET);
     emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, EMU8K_DRAM_OFFSET);
@@ -158,9 +159,10 @@ uint32_t gusemu_init(gusemu_init_t *init) {
     // init memory pool for emulation
     gus_state.mem8start = EMU8K_DRAM_OFFSET;
     gus_state.mem8len   = init->memsize;
-    if (gus_state.emuflags & GUSEMU_16BIT_SAMPLES) {
-        gus_state.mem16start = EMU8K_DRAM_OFFSET + gus_state.mem8len;
-        gus_state.mem16len   = init->memsize >> 1; // since we're merging 16bit writes
+    if (gusemu_cmdline.en16bit) {
+        gus_state.emuflags   |= GUSEMU_16BIT_SAMPLES;
+        gus_state.mem16start  = EMU8K_DRAM_OFFSET + gus_state.mem8len;
+        gus_state.mem16len    = init->memsize >> 1; // since we're merging 16bit writes
     }
     gus_state.drammask = (gus_state.mem8len - 1);
 
@@ -941,7 +943,7 @@ uint32_t __trapcall gusemu_3x7_r8_trap (uint32_t port, uint32_t data, uint32_t f
 
     emu8k_waitForWriteFlush(emu8k_state.iobase); // TODO: flush only if last access was write
     emu8k_waitForReadReady(emu8k_state.iobase); 
-    emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALR, EMU8K_DRAM_OFFSET + newreadpos);
+    emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALR, gus_state.mem8start + newreadpos);
     emu8k_waitForReadReady(emu8k_state.iobase);
     emu8k_read (emu8k_state.iobase, EMU8K_REG_SMALD);
     emu8k_waitForReadReady(emu8k_state.iobase);
@@ -949,7 +951,7 @@ uint32_t __trapcall gusemu_3x7_r8_trap (uint32_t port, uint32_t data, uint32_t f
     return rtn;
 }
 
-// TODO: emulate 16bit sample pool write
+// DRAM write, 8bit samples only
 uint32_t __trapcall gusemu_3x7_w8_trap (uint32_t port, uint32_t data, uint32_t flags) {
     uint32_t newwritepos = (gus_state.gf1regs.dramlow.w | (((uint32_t)gus_state.gf1regs.dramhigh.h) << 16));
     if (newwritepos > gus_state.drammask) return 0;
@@ -958,11 +960,46 @@ uint32_t __trapcall gusemu_3x7_w8_trap (uint32_t port, uint32_t data, uint32_t f
     emu8k_waitForWriteFlush(emu8k_state.iobase);
     //if ((gusemu_cmdline.slowdram) || (gus_state.dramwritepos != newwritepos)) {
         gus_state.dramwritepos = newwritepos;
-        emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, EMU8K_DRAM_OFFSET + gus_state.dramwritepos);
+        emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, gus_state.mem8start + gus_state.dramwritepos);
     //}
     // convert to 16 bit
     emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALD, data << 8);
-    gus_state.dramwritepos++;
+
+    return data;
+}
+
+// DRAM write, 16bit samples support
+uint32_t __trapcall gusemu_3x7_w8_trap_16bit(uint32_t port, uint32_t data, uint32_t flags) {
+    uint32_t newwritepos = (gus_state.gf1regs.dramlow.w | (((uint32_t)gus_state.gf1regs.dramhigh.h) << 16));
+    if (newwritepos > gus_state.drammask) return 0;
+
+    // write 8bit sample expanded to 16bit
+    emu8k_waitForWriteFlush(emu8k_state.iobase);
+    emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, gus_state.mem8start + newwritepos);
+    emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALD, data << 8);
+
+#if 1
+    // test if 16bit sample
+    if ((gus_state.wordlatch_active) && (gus_state.dramwritepos == (newwritepos - 1))) {
+        // fill high byte
+        gus_state.wordlatch.h = data & 0xFF;
+        // write 16bit sample
+        emu8k_waitForWriteFlush(emu8k_state.iobase);
+        emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, gus_state.mem16start + (newwritepos >> 1));
+        emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALD, gus_state.wordlatch.w);
+        // reset wordlatch 
+        gus_state.wordlatch_active = 0;
+    } else if ((newwritepos & 1) == 0) {
+        // fill word latch
+        gus_state.wordlatch.l = data & 0xFF;
+        gus_state.wordlatch_active = 1;
+    } else {
+        gus_state.wordlatch_active = 0;
+    }
+#endif
+
+    // save dram write position
+    gus_state.dramwritepos = newwritepos;
 
     return data;
 }

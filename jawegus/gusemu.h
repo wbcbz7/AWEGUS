@@ -27,9 +27,11 @@ struct gusemu_init_t {
 
 // gusemu command line flags
 struct gusemu_cmdline_t {
-    bool    mono;           // force mono panning
-    bool    slowdram;       // use ch28-29 only for DRAM access (slooww)
-    bool    en16bit;        // enable 16bit samples
+    bool        mono;           // force mono panning
+    bool        slowdram;       // use ch28-29 only for DRAM access (slooww)
+    bool        en16bit;        // enable 16bit samples
+    uint32_t    irqemu;         // emulate irq
+    bool        dmaemu;         // emulate dma
 };
 
 // gus emulation structures
@@ -292,6 +294,7 @@ uint32_t __trapcall gusemu_3x4_w16_trap(uint32_t port, uint32_t data, uint32_t f
 // port 3x7 (DRAM data) trap
 uint32_t __trapcall gusemu_3x7_r8_trap (uint32_t port, uint32_t data, uint32_t flags);
 uint32_t __trapcall gusemu_3x7_w8_trap (uint32_t port, uint32_t data, uint32_t flags);
+uint32_t __trapcall gusemu_3x7_w8_trap_16bit(uint32_t port, uint32_t data, uint32_t flags);
 
 // port 2x0 (mix control register) trap
 uint32_t __trapcall gusemu_2x0_w8_trap(uint32_t port, uint32_t data, uint32_t flags);
