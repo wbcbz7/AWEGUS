@@ -22,6 +22,7 @@ there are lots of bugs :D
 ## Application-specific
 
 * GUSPlay applications almost always work fine, with minor whining if samples are not looped properly
+* ..same for MIDAS 0.40a, albeit didn't tested it much
 * Impulse Tracker - one-shot samples are cut after first tick, volume bars are broken
 * Scream Tracker 3.x, Second Reality, Unreal/Future Crew (version 1.1 with GUS support) - ~~corrupted samples at 2nd and further module load~~ fine except for minor ultraclick bugs (see below)
   * ~~ST3: load AWEGUS, run ST3, then load any module - plays fine; then, exit from the tracker, run ST3 again - can't detect GUS. running ULTRINIT then running ST3 again didn't help~~
@@ -34,4 +35,5 @@ there are lots of bugs :D
   * also needs a plenty of low RAM - one part crashed with "not enough memory" but music kept playing and eventually next part started fine; then, a bit later another out of memory crash occured, this time fatal.
 * [Abraham/Plant](https://www.pouet.net/prod.php?which=1201) - ~~some channels play ROM crap alongside with the music~~ now it's much better, but bass sample is not looped (gets cut off) and there is lot of hifreq whining. perhaps bass uses volume ramping for slides
   * upd: ALRIGHT i broke it again :( most samples are cut off early, have absolutely no idea why
-
+* [Psychic Flight/Spirit](https://www.pouet.net/prod.php?which=41739) - uses OUTSB with ES segment override to upload samples, crashes with GPF
+  * upd: Jemm can't handle segment overrides on string I/O, oops

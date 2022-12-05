@@ -504,7 +504,7 @@ void gusemu_update_channel(uint32_t ch, uint32_t flags) {
     }
 
     // process volume control
-    if (flags & GUSEMU_CHAN_UPDATE_VOLCTRL) {
+    if (flags & (GUSEMU_CHAN_UPDATE_VOLCTRL|GUSEMU_CHAN_UPDATE_RAMPSTART|GUSEMU_CHAN_UPDATE_RAMPEND)) {
         // test if volume ramps required
         if (((guschan->volctrl.h & 3) == 0) &&
             ((guschan->ramp_rate.h & 0x3F) > 0))    // if increment==0 then ramp is effectively no-op
@@ -549,6 +549,18 @@ void gusemu_update_channel(uint32_t ch, uint32_t flags) {
         if ((guschan->ctrl.h & 3) && !(guschan->ctrl_r.h & 3))
             flags |= GUSEMU_CHAN_UPDATE_STOP;
         
+        // update positions if 8/16bit changed
+        if ((guschan->ctrl.h ^ guschan->ctrl_r.h) & (1 << 2)) {
+            if (guschan->ctrl.h & (1 << 2)) {
+                // 16bit
+                emuchan->flags |=  EMUSTATE_CHAN_16BIT;
+            } else {
+                // 8bit
+                emuchan->flags &= ~EMUSTATE_CHAN_16BIT;
+            }
+            flags |= GUSEMU_CHAN_UPDATE_LOOPSTART|GUSEMU_CHAN_UPDATE_LOOPEND|GUSEMU_CHAN_UPDATE_POS;
+        }
+
 #if 0
         // save play position on play->stop edge, but only if position is valid!
         if ((guschan->ctrl.h & 3) && !(guschan->ctrl_r.h & 3) && !(emuchan->state & EMUSTATE_CHAN_INVALID_POS)) {
