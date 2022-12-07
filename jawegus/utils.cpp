@@ -52,3 +52,24 @@ void jlm_pfree(void* addr, uint32_t pages) {
     _PageFree((void*)addr, 0);
 }
 
+// allocate DOS memory, returns segment!
+uint32_t getdosmem(uint32_t paragraphs) {
+    Client_Reg_Struc *pcl = jlm_BeginNestedExec();
+    pcl->Client_EAX = 0x4800;
+    pcl->Client_EBX = paragraphs;
+    Exec_Int(pcl, 0x21);
+    End_Nest_Exec(pcl);
+    return (pcl->Client_EFlags & 1) ? 0 : pcl->Client_EAX;
+}
+
+// free DOS memory
+uint32_t freedosmem(uint32_t segment) {
+    Client_Reg_Struc *pcl = jlm_BeginNestedExec();
+    pcl->Client_EAX = 0x4900;
+    pcl->Client_ES = segment;
+    Exec_Int(pcl, 0x21);
+    End_Nest_Exec(pcl);
+    return (pcl->Client_EFlags & 1);
+}
+
+

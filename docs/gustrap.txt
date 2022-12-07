@@ -31,6 +31,7 @@ i/o port map:
            7         r    d     DMA TC IRQ Pending
     
     2x8         b    rw   y    AdLib/Timer Status/Register Index           (4)
+           7         r    y     bits 5 and 6 ORed
            6         r    y     Timer 1 Expired
            5         r    y     Timer 2 Expired
            
@@ -219,4 +220,33 @@ register map:
       - 2x6 (byte)
         - 2x6 is required for IRQ operation, 2x0 is write-only and most
           software use it just for line in/out control. can be ignored.
+
+
+ IRQ logic:
+    one of sparsely documented GUS aspects, info gathered by reading Interwave
+    Programmer's Guide, plus observed DOSBox/PCem behavior
+    (we will not discuss MIDI and AdLib/SB emulation IRQs here :)
+
+    GF1 generally has 5 input sources:
+    - wavetable   IRQ   (upon reaching Wave Loop boundary)
+    - volume ramp IRQ   (upon reaching Ramp Loop boundary)
+    - timer 1 and 2 IRQ (upon timer overflow)
+    - DMA Terminal Count IRQ
+    
+    Each interrupt is signalled in IRQ Status Register (2x6). 
+    NOTE that if any of bits are non-zero, GF1 will NOT trigger another IRQ,
+    until all interrups were acknowledged:
+
+    - wavetable and volume ramp IRQ - by selecting GF1 register 0x8F.
+      Reading register 0x8F gives interrupt reason for each channel.
+    - timer IRQs - by clearing, THEN enabling corresponding Timer IRQ Enable
+      bit in Timer IRQ Control register (GF1 index 0x45)
+      NOTE: setting Clear IRQ bit in AdLib Timer Control (2x9 index 04)
+      clears only bits in AdLib Status (2x8), but doesn't touch actual IRQ
+    - DMA Terminal Count IRQ is cleared by reading DRAM DMA Control register
+      (GF1 index 0x41)
+
+    Note that wavetable and ramp IRQ condition is checked every time, even 
+    if voice or ramp is stopped. make sure to disable IRQ for channel if no
+    loops are used to prevent stuck IRQs
 

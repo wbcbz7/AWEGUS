@@ -159,18 +159,20 @@
         connected to selected COM port, or unexpected things could happen :)
 
     since Jemm doesn't have any IRQ virtualization support, make sure you have
-    only one device using one IRQ, and if possible, set GUS emulated IRQ number
-    to emulator timer IRQ: i.e. if you're using SB16 IRQs at IRQ5, it's best to
-    set GUS IRQ also to 5.
+    only one device using same IRQ, and if possible, set GUS emulated IRQ line
+    to emulator timer IRQ: i.e. if have SB16 at IRQ5, it's best to set GUS IRQ
+    also to 5. Moreover, V86 task will lose emulated GUS interrupts during 
+    virtual IF flag cleared period, as it's unsafe to run a virtual IRQ if
+    they are disabled.
 
     note that currently only GUS timer IRQs are emulated, wavetable/volume
-    ramp IRQs are ignored and never signalled.
+    ramp IRQs are ignored and never signalled.    
 
  7. DMA emulation (TO BE IMPLEMENTED)
     alas, Jemm doesn't provide DMA virtualization API either, so DMA emulation
-    is done by monitoring GF1 DMA control registers. if DMA transfer is started,
-    read 8237 and DMA page registers to determine buffer address and size.
-    then, simply copy data to EMU8000 DRAM and signal DMA completion (and 
+    is done by monitoring GF1 DMA control registers. if DMA transfer is started
+    AWEGUS reas 8237 and DMA page registers to get buffer address and size.
+    then, is simply copies data to EMU8000 DRAM and signals DMA completion (and 
     optionally an IRQ). simple yet enough for most GUS players.
     circular biffer playback will not work.
 

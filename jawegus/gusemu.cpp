@@ -15,6 +15,13 @@ gusemu_cmdline_t gusemu_cmdline;
 
 // do everything here. really
 
+// ----------------------------
+// forward declarations
+uint32_t gusemu_update_irq_status();
+uint32_t gusemu_update_gf1_irq_status();
+void gusemu_update_active_channel_count();
+
+// ----------------------------
 void gusemu_emu8k_reset() {
     // reset EMU8000
     //emu8k_hwinit(emu8k_state.iobase);
@@ -25,9 +32,6 @@ void gusemu_emu8k_reset() {
     emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALR, EMU8K_DRAM_OFFSET);
     emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, EMU8K_DRAM_OFFSET);
 }
-
-// forward declarations
-void gusemu_update_active_channel_count();
 
 // reset emulation
 uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
@@ -55,6 +59,7 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
     }
 
     // stop emulation timer (TODO)
+    gus_state.timer.flags = 0;
     // stop pending DMA stuff (TODO)
     emu8k_state.irqemu.rampmask = emu8k_state.irqemu.wavemask = emu8k_state.irqemu.rollovermask = 0;
     
@@ -140,10 +145,6 @@ uint32_t gusemu_init(gusemu_init_t *init) {
     gus_state.intr              = (gus_state.irq >= 8) ? gus_state.irq + 0x70 : gus_state.irq + 8;
     gus_state.dma               = init->gusdma;
     emu8k_state.iobase          = init->emubase;
-    gus_state.timer.emu.iobase  = init->timerbase;
-    gus_state.timer.emu.irq     = init->timerirq;
-    gus_state.timer.emu.dma     = init->timerdma;
-    gus_state.timer.emu.intr    = (init->timerirq >= 8) ? init->timerirq + 0x70 : init->timerirq + 8;
 
     // install port traps
     if (iotrap_install(gus_state.iobase) == 0) {
@@ -154,7 +155,15 @@ uint32_t gusemu_init(gusemu_init_t *init) {
     // init EMU8000 as following: 14 channels for playback, rest (interleaved) for local memory access and FM passthru
     gusemu_emu8k_reset();
 
-    // TODO: IRQ/DMA virtualization init (JEMM doesn't provide any interfaces so ignore for now)
+    // TODO: DMA virtualization init (JEMM doesn't provide any interfaces so ignore for now)
+    // init IRQ emulation timer here
+#if 0
+    gus_state.timer.emu.iobase  = init->timerbase;
+    gus_state.timer.emu.irq     = init->timerirq;
+    gus_state.timer.emu.dma     = init->timerdma;
+    gus_state.timer.emu.intr    = (init->timerirq >= 8) ? init->timerirq + 0x70 : init->timerirq + 8;
+#endif
+
 
     // init memory pool for emulation
     gus_state.mem8start = EMU8K_DRAM_OFFSET;
@@ -189,10 +198,25 @@ uint32_t gusemu_deinit() {
 }
 
 // send IRQ
+// TODO: move to backend-specific header
 void gusemu_send_irq() {
-    Client_Reg_Struc *cr = jlm_BeginNestedExec();
-    Exec_Int(cr, gus_state.intr);
-    End_Nest_Exec(cr);
+    // check if IRQ is unmasked
+    // this means host application can prevent IRQ from being received
+    if ((inp(0x21) & (1 << gus_state.irq)) == 0) {
+        Client_Reg_Struc *cr = jlm_BeginNestedExec();
+        // check virtual IF flag
+        if (cr->Client_EFlags & (1 << 9)) {
+            // set, so execute interrupt
+            Exec_Int(cr, gus_state.intr);
+        }
+        End_Nest_Exec(cr);
+    }
+
+    // since JEMM lacks IRQ virtualization, if V86/DPMI task runs with 
+    // interrupts disabled, there is no possibility to schedule interrupt
+    // upon virtual IF being set, emulating 8259A behavior. this means V86
+    // task will lose emulated GUS ints during virtual IF being clear :(
+
 }
 
 // -------------------------------
@@ -306,18 +330,14 @@ void gusemu_process_output_enable() {
     }
 }
 
-// update DRAM pointers (unused?)
-void gusemu_update_dram_pointers() {
-    // gus_state.gf1regs.dramhigh is 8bit register, and 8bit regs in GF1 are hibyte
-    gus_state.dramwritepos  = ((gus_state.gf1regs.dramhigh.h << 16) | (gus_state.gf1regs.dramlow.w)) & 0xFFFFF;
-}
-
 // process timers, called for every emulation timer tick
 void gusemu_process_timers() {
     bool do_irq = false;
+    bool empty_2x6 = gusemu_update_irq_status() == 0;
 
     // process timer 1
     if (gus_state.timer.flags & GUSEMU_TIMER_T1_RUNNING) {
+
         gus_state.timer.t1_pos += gus_state.timer.t1_add;
         if (gus_state.timer.t1_pos & 0x8000) {
             // overflow
@@ -348,8 +368,10 @@ void gusemu_process_timers() {
         }
     }
 
-    // trigger IRQ
-    if (do_irq) gusemu_send_irq();
+    // call IRQ from here ONLY IF timer instant mode! also take 2x6 in the account
+    if (((gus_state.emuflags & GUSEMU_TIMER_MODE_MASK) == GUSEMU_TIMER_INSTANT) && (true) && (do_irq)) {
+        gusemu_send_irq();
+    }
 }
 
 void gusemu_init_timer_delta() {
@@ -364,18 +386,19 @@ void gusemu_init_timer_delta() {
 
     // timer 1 freq is 12600 hz, timer 2 is 4 times slower
     // find faster out of two timers
-    uint32_t t1freq = ((12600 << 16) / (256 - gus_state.gf1regs.timer1count.h));
+    uint32_t t1freq = ((12600 << 16) / (256 - gus_state.gf1regs.timer1count.h)); // freq in Hz, 16.16fx
     uint32_t t2freq = ((12600 << 14) / (256 - gus_state.gf1regs.timer2count.h));
 }
 
-// query IRQ status
-void gusemu_update_irq_status() {
-    // scan through all channels, collect their IRQ status
-    uint32_t gf1_irqstatus = gus_state.gf1regs.irqstatus;
+// query GF1 IRQ status aka reg 0x8F
+// returns accumulated wave+ramp IRQ flags for 2x6
+uint32_t gusemu_update_gf1_irq_status() {
+    uint32_t gf1_irqstatus = 0;
     uint32_t irqstatus_2x6 = 0;
+
     for (int ch = 0; ch < 32; ch++) {
-        if (gus_state.gf1regs.chan[ch].ctrl.h    & (1 << 7))  irqstatus_2x6 |= (1 << 5);
-        if (gus_state.gf1regs.chan[ch].volctrl.h & (1 << 7))  irqstatus_2x6 |= (1 << 6);
+        if (gus_state.gf1regs.chan[ch].ctrl.h    & (1 << 7)) irqstatus_2x6 |= (1 << 5);
+        if (gus_state.gf1regs.chan[ch].volctrl.h & (1 << 7)) irqstatus_2x6 |= (1 << 6);
 
         if ((gf1_irqstatus == 0) &&
             (gus_state.gf1regs.chan[ch].ctrl.h    & (1 << 7)) && 
@@ -384,17 +407,35 @@ void gusemu_update_irq_status() {
             gf1_irqstatus = (ch & 0x1F) | 0x20;
             if (gus_state.gf1regs.chan[ch].ctrl.h    & (1 << 7)) gf1_irqstatus |= (1 << 6);
             if (gus_state.gf1regs.chan[ch].volctrl.h & (1 << 7)) gf1_irqstatus |= (1 << 7);
+
+            // clear current channel IRQ status (apparently)
+            gus_state.gf1regs.chan[ch].ctrl.h       &= ~(1 << 7);
+            gus_state.gf1regs.chan[ch].volctrl.h    &= ~(1 << 7);
         }
     }
+
+    return irqstatus_2x6;
+}
+
+// query IRQ status, returns 2x6 content
+uint32_t gusemu_update_irq_status() {
+    // scan through all channels, collect their IRQ status
+    uint32_t irqstatus_2x6 = 0;
+
+#if 0   // wave/ramp IRQs are disabled for now and not reported
+    irqstatus_2x6 |= gusemu_update_gf1_irq_status();
+#endif
     
     // more irqs!
-    if (gus_state.timer.flags & GUSEMU_TIMER_T1_IRQ) irqstatus_2x6 |= (1 << 2);
-    if (gus_state.timer.flags & GUSEMU_TIMER_T2_IRQ) irqstatus_2x6 |= (1 << 3);
-    if (gus_state.gf1regs.dmactrl.h & (1 << 7))      irqstatus_2x6 |= (1 << 7);
+    if (gus_state.timer.flags & GUSEMU_TIMER_T1_IRQ) irqstatus_2x6 |= (1 << 2); // timer 1
+    if (gus_state.timer.flags & GUSEMU_TIMER_T2_IRQ) irqstatus_2x6 |= (1 << 3); // timer 2
+    if (gus_state.gf1regs.dmactrl.h & (1 << 7))      irqstatus_2x6 |= (1 << 7); // DMA complete
 
     // save irq masks
     gus_state.irqstatus         = irqstatus_2x6;
-    gus_state.gf1regs.irqstatus = gf1_irqstatus;
+
+    // do not assert IRQ if older interrupts are yet to be cleared
+    return irqstatus_2x6;
 }
 
 // update timer state
@@ -404,8 +445,9 @@ void gusemu_update_timers(uint32_t flags) {
 
         // parse new timerdata
         if (timerdata & (1 << 7)) {
-            // timer IRQ clear
-            gus_state.timer.flags &= ~(GUSEMU_TIMER_T1_IRQ | GUSEMU_TIMER_T2_IRQ | GUSEMU_TIMER_T1_OVERFLOW | GUSEMU_TIMER_T2_OVERFLOW);
+            // NOTE NOTE NOTE! clears _AdLib Status_ IRQ bits ONLY!
+            // to acknowledge GUS timer IRQ, clear IRQ enable bits in GF1 reg 45, then set them again
+            gus_state.timer.flags &= ~(GUSEMU_TIMER_T1_OVERFLOW | GUSEMU_TIMER_T2_OVERFLOW);
             timerdata &= ~(1 << 7); // IRQ clear bit inhibits other bits!
         }
 
@@ -422,23 +464,40 @@ void gusemu_update_timers(uint32_t flags) {
         }
 
         if (timerdata & (1 << 6))
-            // timer 1 mask
-            gus_state.timer.flags &= ~GUSEMU_TIMER_T1_RUNNING;
+            // timer 1 adlib mask
+            gus_state.timer.flags &= ~GUSEMU_TIMER_T1_ADLIB_UNMASKED;
+        else 
+            gus_state.timer.flags |=  GUSEMU_TIMER_T1_ADLIB_UNMASKED;
         
         if (timerdata & (1 << 5))
-            // timer 2 mask
-            gus_state.timer.flags &= ~GUSEMU_TIMER_T2_RUNNING;
+            // timer 2 adlib mask
+            gus_state.timer.flags &= ~GUSEMU_TIMER_T2_ADLIB_UNMASKED;
+        else
+            gus_state.timer.flags |=  GUSEMU_TIMER_T2_ADLIB_UNMASKED;
+    }
+
+    if (flags & GUSEMU_TIMER_UPDATE_TIMERCTRL) {
+        uint8_t irqctrl = gus_state.gf1regs.timerctrl.h;
+
+        if ((irqctrl & (1 << 2)) == 0)
+            // clear Timer 1 IRQ
+            gus_state.timer.flags &= ~GUSEMU_TIMER_T1_IRQ;
+        if ((irqctrl & (1 << 3)) == 0)
+            // clear Timer 2 IRQ
+            gus_state.timer.flags &= ~GUSEMU_TIMER_T2_IRQ;
     }
 
     // initialize timer variables
-    if (flags & (GUSEMU_TIMER_UPDATE_T1COUNT|GUSEMU_TIMER_UPDATE_T2COUNT))
+    if (flags & (GUSEMU_TIMER_UPDATE_T1COUNT|GUSEMU_TIMER_UPDATE_T2COUNT)) {
         gusemu_init_timer_delta();
+    }
 
     // TODO: init emulation timer
 
     // process timers if instant timer emulation mode
-    if ((gus_state.emuflags & GUSEMU_TIMER_MODE_MASK) == GUSEMU_TIMER_INSTANT)
+    if ((gus_state.emuflags & GUSEMU_TIMER_MODE_MASK) == GUSEMU_TIMER_INSTANT) {
         gusemu_process_timers();
+    }
 }
 
 // get channel control
@@ -792,11 +851,12 @@ void gusemu_gf1_write(uint32_t reg, uint32_t ch, uint32_t data) {
 // dispatch GF1 read
 uint32_t gusemu_gf1_read(uint32_t reg, uint32_t ch) {
     uint32_t data;
-    if ((reg >= 0x80) && (ch >= 32)) return 0xFFFF; // unknown register!
+    if ((reg >= 0x80) && (ch >= 32)) return 0; // unknown register!
 
     switch (reg) {
         // global
         case 0x41: // DRAM DMA Control
+            // TODO: report DMA IRQ pending (bit 6 is data size on write and IRQ pending on read)
             data = gus_state.gf1regs.dmactrl.w & (0x3F00); // ignore DMA IRQ Pending bit for now
             break;
         case 0x49: // Sampling Control
@@ -827,8 +887,7 @@ uint32_t gusemu_gf1_read(uint32_t reg, uint32_t ch) {
             data = gusemu_get_current_pos(ch) << 9;
             break;
         case 0x8F: // IRQ status
-            gus_state.gf1regs.irqstatus = 0;
-            gusemu_update_irq_status();
+            gusemu_update_gf1_irq_status();
             data = gus_state.gf1regs.irqstatus << 8;
             break;
         case 0x89: // current volume
@@ -851,7 +910,7 @@ uint32_t gusemu_gf1_read(uint32_t reg, uint32_t ch) {
 
         // unknown
         default: 
-            data = 0xFFFF;
+            data = 0;
             break;
     }
 
@@ -1015,16 +1074,17 @@ uint32_t __trapcall gusemu_2x0_w8_trap(uint32_t port, uint32_t data, uint32_t fl
 
 // port 2x6 (IRQ status) trap
 uint32_t __trapcall gusemu_2x6_r8_trap(uint32_t port, uint32_t data, uint32_t flags) {
-    gusemu_update_irq_status();
-    return gus_state.irqstatus;
+    return gusemu_update_irq_status();
 }
 
 // port 2x8/2x9 (timer stuff) trap
 uint32_t __trapcall gusemu_2x8_r8_trap(uint32_t port, uint32_t data, uint32_t flags) {
-    uint32_t timerctrl = 0;
-    if (gus_state.timer.flags & GUSEMU_TIMER_T1_OVERFLOW) timerctrl |= ((1 << 6) | (1 << 7));
-    if (gus_state.timer.flags & GUSEMU_TIMER_T2_OVERFLOW) timerctrl |= ((1 << 5) | (1 << 7));
-    return timerctrl;
+    uint32_t timerstatus = 0;
+    if (gus_state.timer.flags & (GUSEMU_TIMER_T1_ADLIB_UNMASKED|GUSEMU_TIMER_T1_OVERFLOW))
+        timerstatus |= ((1 << 6) | (1 << 7));
+    if (gus_state.timer.flags & (GUSEMU_TIMER_T2_ADLIB_UNMASKED|GUSEMU_TIMER_T2_OVERFLOW))
+        timerstatus |= ((1 << 5) | (1 << 7));
+    return timerstatus;
 }
 uint32_t __trapcall gusemu_2x8_w8_trap(uint32_t port, uint32_t data, uint32_t flags) {
     gus_state.timerindex = data;

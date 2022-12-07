@@ -23,3 +23,9 @@ void* jlm_pmalloc(uint32_t pages, bool writeable = true);
 
 // free memory block (NOTE: ALWAYS provide number of pages commited, or else leak will occur!)
 void jlm_pfree(void* addr, uint32_t pages);
+
+// allocate DOS memory, returns segment!
+uint32_t getdosmem(uint32_t paragraphs);
+
+// free DOS memory
+uint32_t freedosmem(uint32_t segment);

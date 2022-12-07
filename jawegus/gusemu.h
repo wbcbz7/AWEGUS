@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include "iotrap.h"
 #include "gf1defs.h"
+#include "timer.h"
 
 #pragma pack(push, 1)
 // gusemu init structure
@@ -140,12 +141,14 @@ enum {
 };
 
 enum {
-    GUSEMU_TIMER_T1_RUNNING  = (1 << 0),
-    GUSEMU_TIMER_T1_OVERFLOW = (1 << 1),
-    GUSEMU_TIMER_T1_IRQ      = (1 << 2),
-    GUSEMU_TIMER_T2_RUNNING  = (1 << 3),
-    GUSEMU_TIMER_T2_OVERFLOW = (1 << 4),
-    GUSEMU_TIMER_T2_IRQ      = (1 << 5),
+    GUSEMU_TIMER_T1_RUNNING         = (1 << 0),
+    GUSEMU_TIMER_T1_OVERFLOW        = (1 << 1),
+    GUSEMU_TIMER_T1_IRQ             = (1 << 2),
+    GUSEMU_TIMER_T1_ADLIB_UNMASKED  = (1 << 3),
+    GUSEMU_TIMER_T2_RUNNING         = (1 << 5),
+    GUSEMU_TIMER_T2_OVERFLOW        = (1 << 6),
+    GUSEMU_TIMER_T2_IRQ             = (1 << 7),
+    GUSEMU_TIMER_T2_ADLIB_UNMASKED  = (1 << 8),
 };
 
 // global GUS state
@@ -170,7 +173,7 @@ struct gus_state_t {
         
         // wavetable/ramp emulation procedure runs as "third" timer. may use "faster" timer frequency,
         // or run as free-running timer
-        uint16_t flags;
+        uint32_t flags;
 
         uint16_t t1_pos; // 1.15fx, that's sufficient enough
         uint16_t t1_add; // --//--
@@ -178,12 +181,8 @@ struct gus_state_t {
         uint16_t t2_pos; // --//--
         uint16_t t2_add; // --//--
 
-        // emulation timer resources
-        struct {
-            uint16_t iobase;
-            uint8_t  irq, intr;
-            uint8_t  dma;
-        } emu;
+        // emulation timer device
+        irq_timer_t *dev;
     } timer;
     
     // --------------------------------
@@ -220,7 +219,7 @@ struct gus_state_t {
     // --------------------------------
     // helper stuff
 
-    // last DRAM write pointer (read are always uncached)
+    // last DRAM write pointer (reads are always uncached)
     uint32_t dramwritepos;
 
     // DRAM address mask
