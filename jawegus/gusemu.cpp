@@ -3,6 +3,7 @@
 #include "jlm.h"
 #include "utils.h"
 #include "gusemu.h"
+#include "dmaemu.h"
 #include "console.h"
 #include "iotrap.h"
 #include "emu8000.h"
@@ -164,12 +165,10 @@ uint32_t gusemu_init(gusemu_init_t *init) {
     gus_state.timer.emu.intr    = (init->timerirq >= 8) ? init->timerirq + 0x70 : init->timerirq + 8;
 #endif
 
-
     // init memory pool for emulation
     gus_state.mem8start = EMU8K_DRAM_OFFSET;
     gus_state.mem8len   = init->memsize;
-    if (gusemu_cmdline.en16bit) {
-        gus_state.emuflags   |= GUSEMU_16BIT_SAMPLES;
+    if (gus_state.emuflags & GUSEMU_16BIT_SAMPLES) {
         gus_state.mem16start  = EMU8K_DRAM_OFFSET + gus_state.mem8len;
         gus_state.mem16len    = init->memsize >> 1; // since we're merging 16bit writes
     }
@@ -369,7 +368,7 @@ void gusemu_process_timers() {
     }
 
     // call IRQ from here ONLY IF timer instant mode! also take 2x6 in the account
-    if (((gus_state.emuflags & GUSEMU_TIMER_MODE_MASK) == GUSEMU_TIMER_INSTANT) && (true) && (do_irq)) {
+    if (((gus_state.emuflags & GUSEMU_TIMER_MODE_MASK) == GUSEMU_TIMER_INSTANT) && (empty_2x6) && (do_irq)) {
         gusemu_send_irq();
     }
 }
@@ -560,7 +559,7 @@ void gusemu_update_channel(uint32_t ch, uint32_t flags) {
     if (flags & GUSEMU_CHAN_UPDATE_PAN) {
         // convert panning from 0..F to 0..FF range
         uint32_t pan = (15 - (guschan->pan.h & 0x0F));
-        pan = gusemu_cmdline.mono ? 0x80 : (pan | (pan << 4));
+        pan = gus_state.emuflags & GUSEMU_MONO_PANNING ? 0x80 : (pan | (pan << 4));
         emuchan->pan = pan;
     }
 
@@ -727,8 +726,10 @@ void gusemu_gf1_write(uint32_t reg, uint32_t ch, uint32_t data) {
     if (reg >= 0x40) switch (reg) {
         // global
         case 0x41: // DRAM DMA Control
-            gus_state.gf1regs.dmactrl.w = data;
-            // no DMA emulation for now
+            gus_state.gf1regs.dmactrl.w = data & 0xFF00; // + clear DMA TC shadow bit
+            // run DMA emulation
+            if ((gus_state.emuflags & GUSEMU_EMULATE_DMA) && (gus_state.gf1regs.dmactrl.h & 1))
+                gusemu_dma_start();
             break;
         case 0x42: // DMA Start Address
             gus_state.gf1regs.dmaaddr.w = data;
@@ -856,14 +857,15 @@ uint32_t gusemu_gf1_read(uint32_t reg, uint32_t ch) {
     switch (reg) {
         // global
         case 0x41: // DRAM DMA Control
-            // TODO: report DMA IRQ pending (bit 6 is data size on write and IRQ pending on read)
-            data = gus_state.gf1regs.dmactrl.w & (0x3F00); // ignore DMA IRQ Pending bit for now
+            // report DRAM TC in bit 6, then acknowledge and clear it
+            data = (gus_state.gf1regs.dmactrl.w & 0xBF00) | ((gus_state.gf1regs.dmactrl.w << 8) & 0x4000);
+            gus_state.gf1regs.dmactrl.l &= ~(1 << 6); 
             break;
         case 0x49: // Sampling Control
             data = gus_state.gf1regs.recctrl.w;
             break;
         case 0x4C: // reset
-            // right after reset (bit0 0->1 pulse) GUS always return bit 0 only
+            // right after reset (bit0 0->1 pulse) GUS always returns bit 0 only
             // you need to set bits 1-2 again to make them effective
             if ((gus_state.gf1regs.reset_r == 0) && (gus_state.gf1regs.reset & 1))
                 data = 1;

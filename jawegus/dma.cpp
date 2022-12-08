@@ -15,6 +15,22 @@ dmaPorts dmaPorts[] = {
     { 0xCC, 0xCE, 0x8A, 0xD2, 0xD4, 0xD6, 0xD8, 0 }, // 7
 };
 
+// return current count register value
+void dmaSet8237Count(uint32_t chan, uint32_t count) {
+    // clear flip-flop
+    inp (dmaPorts[chan].clear);
+    outp(dmaPorts[chan].count,  count        & 0xFF);
+    outp(dmaPorts[chan].count, (count >>  8) & 0xFF);
+}
+
+// return page register data
+void dmaSet8237Address(uint32_t chan, uint32_t address) {
+    // clear flip-flop
+    inp (dmaPorts[chan].clear);
+    outp(dmaPorts[chan].address,  address        & 0xFF);
+    outp(dmaPorts[chan].address, (address >>  8) & 0xFF);
+}
+
 bool dmaSetup(uint32_t chan, void *block, uint32_t len, uint32_t mode) {
     unsigned char rawchan = chan & 3;
     
@@ -103,4 +119,9 @@ uint32_t dmaGetCurrentCount(uint32_t chan) {
     // clear flip-flop
     inp(dmaPorts[chan].clear);
     return dmaRead16bit(dmaPorts[chan].count);
+}
+
+// return page register data
+uint32_t dmaGetPage(uint32_t chan) {
+    return inp(dmaPorts[chan].page);
 }

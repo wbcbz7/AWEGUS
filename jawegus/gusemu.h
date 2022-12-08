@@ -111,7 +111,7 @@ enum {
     GUSEMU_TIMER_IRQ        = (1 << 2), // run timer emulation IRQ
 
     // emulation IRQ source
-    GUSEMU_IRQ_SOURCE_MASK   = (3 << 4),
+    GUSEMU_IRQ_SOURCE_MASK  = (3 << 4),
     GUSEMU_IRQ_SOURCE_SB16  = (0 << 4), // play silent buffer through SB16 audio
     GUSEMU_IRQ_SOURCE_COM   = (1 << 4), // (ab)use 8250 UART as programmable timer
     GUSEMU_IRQ_SOURCE_RTC   = (2 << 4), // run RTC periodical IRQ
@@ -134,6 +134,9 @@ enum {
 
     // remove unnecessary delays
     GUSEMU_PATCH_DELAYS     = (1 << 10),
+
+    // use mono panning
+    GUSEMU_MONO_PANNING     = (1 << 11),
 
     // -------------------
     // gus is muted

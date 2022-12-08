@@ -51,8 +51,8 @@ void emu8k_dramEnable(uint32_t iobase, bool readWrite, uint32_t startChannel) {
 // 0 if timeout, non-0 if done
 int emu8k_waitForWriteFlush(uint32_t iobase) {
     uint32_t timeout = (1 << 12);    // ~3ms on ISA 8.33Mhz
-    outpw(iobase + 0x802, EMU8K_REG_SMALW & 0xFF); 
-    while ((--timeout != 0) && ((inpd(iobase + 0x400) & (1 << 31)) != 0));
+    //outpw(iobase + 0x802, EMU8K_REG_SMALW & 0xFF); 
+    while ((--timeout != 0) && ((emu8k_read(iobase, EMU8K_REG_SMALW) & (1 << 31)) != 0));
     
     return timeout;
 }
@@ -60,8 +60,8 @@ int emu8k_waitForWriteFlush(uint32_t iobase) {
 // 0 if timeout, non-0 if done
 int emu8k_waitForReadReady(uint32_t iobase) {
     uint32_t timeout = (1 << 12);    // ~3ms on ISA 8.33Mhz
-    outpw(iobase + 0x802, EMU8K_REG_SMALR & 0xFF); 
-    while ((--timeout != 0) && ((inpd(iobase + 0x400) & (1 << 31)) != 0));
+    //outpw(iobase + 0x802, EMU8K_REG_SMALR & 0xFF); 
+    while ((--timeout != 0) && ((emu8k_read(iobase, EMU8K_REG_SMALR) & (1 << 31)) != 0));
     
     return timeout;
 }

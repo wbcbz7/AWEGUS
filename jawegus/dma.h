@@ -41,7 +41,11 @@ bool dmaPause(uint32_t chan);
 // stop transfer
 bool dmaStop(uint32_t chan);
 
-// get current address and count
+// set i8237 address/count
+void dmaSet8237Count(uint32_t chan, uint32_t count);
+void dmaSet8237Address(uint32_t chan, uint32_t address);
+
+// get current page address and count
 uint32_t dmaGetCurrentAddress(uint32_t chan);
 uint32_t dmaGetCurrentCount(uint32_t chan);
-
+uint32_t dmaGetPage(uint32_t chan);

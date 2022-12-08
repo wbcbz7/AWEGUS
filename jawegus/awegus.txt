@@ -132,7 +132,7 @@
           for now has no effect, as DRAM autoincrement is disabled anyway
     -i[x], --irq=[x]
         - enable IRQ emulation, x: (TO BE IMPLEMENTED)
-            0 - use SB16 in dummy playback mode
+            0 - use SB16 in dummy playback mode (default)
             1 - use COM1 at 0x3F8/IRQ4
             2 - use COM2 at 0x2F8/IRQ3
           see "IRQ emulation" section below for more info
@@ -171,10 +171,10 @@
  7. DMA emulation (TO BE IMPLEMENTED)
     alas, Jemm doesn't provide DMA virtualization API either, so DMA emulation
     is done by monitoring GF1 DMA control registers. if DMA transfer is started
-    AWEGUS reas 8237 and DMA page registers to get buffer address and size.
+    AWEGUS reads 8237 and DMA page registers to get buffer address and size.
     then, is simply copies data to EMU8000 DRAM and signals DMA completion (and 
     optionally an IRQ). simple yet enough for most GUS players.
-    circular biffer playback will not work.
+    circular biffer playback perhaps will not work (it needs wave IRQs anyway)
 
     NB: only 8bit DMA channels are emulated!
 

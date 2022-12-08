@@ -48,6 +48,7 @@ cmdline_params_t cmdline_params[] = {
     {'M', CMD_FLAG_BOOL,    "MONO",     &gusemu_cmdline.mono, 0},
     {'W', CMD_FLAG_BOOL,    "16BIT",    &gusemu_cmdline.en16bit, 0},
     {0,   CMD_FLAG_INT,     "MEM",      &cmdflags.dramsize, 0},
+    {'D', CMD_FLAG_BOOL,    "DMA",      &gusemu_cmdline.dmaemu, 0},
 };
 
 // --------------
@@ -55,7 +56,6 @@ cmdline_params_t cmdline_params[] = {
 // show help
 void showHelp() {
     puts(
-        "help:\r\n"
         " usage: JLOAD JAWEGUS.EXE [params...]\r\n"
         " parameters:\r\n"
         "\r\n"
@@ -64,6 +64,11 @@ void showHelp() {
         " -m, --mono       - force mono panning\r\n"
         " -s, --slowdram   - disable DRAM write position autoincrement\r\n"
         "     --mem=[x]    - limit emulated GUS DRAM to x kbytes\r\n"
+        " -i[x], --irq=[x] - enable IRQ emulation, x: \r\n"
+        "       0 - use SB16 in dummy playback mode (default)\r\n"
+        "       1 - use COM1 at 0x3F8/IRQ4\r\n"
+        "       2 - use COM2 at 0x2F8/IRQ3\r\n"
+        " -d,  --dma       - enable DMA emulation (HIGHLY EXPERIMENTAL!)\r\n"
         "\r\n"
     );
 }
@@ -115,6 +120,16 @@ bool get_environment_values() {
         now = next; idx++;
     }
 
+    // validate fields
+    if (init_data.gusirq >= 8) {
+        printf("error: GUS emulated IRQ must be 7 or less!\r\n");
+        return false;
+    }
+    if (init_data.gusdma >= 4) {
+        printf("error: GUS emulated DMA must be 3 or less!\r\n");
+        return false;
+    }
+
     return true;
 }
 
@@ -163,13 +178,21 @@ int install(char *cmdline) {
         return 0;
     }
 
+    // set data flags
+    if (gusemu_cmdline.en16bit) init_data.emuflags |= GUSEMU_16BIT_SAMPLES;
+    if (gusemu_cmdline.mono)    init_data.emuflags |= GUSEMU_MONO_PANNING;
+    if (gusemu_cmdline.dmaemu)  init_data.emuflags |= GUSEMU_EMULATE_DMA;
+
     // init emulation
     if (gusemu_init(&init_data) == 0) {
         puts("error: unable to initialize GUS emulation\r\n");
         return 0;
-    } else
+    } else {
         printf("GUS emulation at port %X installed, %d KB DRAM available\r\n",
                 init_data.gusbase, init_data.memsize >> 10);
+        if (gusemu_cmdline.dmaemu)
+            printf("DMA emulation at DMA %d installed\r\n", init_data.gusdma);
+    }
 
     return 1;
 }
