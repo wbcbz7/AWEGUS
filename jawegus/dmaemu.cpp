@@ -35,24 +35,25 @@ uint32_t gusemu_dma_upload_block(uint32_t dst, uint8_t* src, uint32_t count, uin
 
         // read by 4 bytes, this will slow things down on misaligned addresses but I don't care
         uint32_t sample = (*(uint32_t*)src_now) ^ xormask;
-        RASTER((sample & 0x3F), ((sample>>8) & 0x3F), ((sample>>16) & 0x3F));
 
         // NOTE - flush write buffer for every byte transferred, because DRAM upload time depends
         // on channel count allocated for DRAM, and apparently EMU8000 can't hold IOCHRDY too
         // long while write buffer full, due to ISA refresh cycles
         uint32_t sampleCount = currentCount;
-        while (sampleCount-- > 0) {
+        if (gus_state.emuflags & GUSEMU_SLOW_DRAM) while (sampleCount-- > 0) {
             emu8k_waitForWriteFlush(emu8k_state.iobase);
             emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, gus_state.mem8start + dst_now);
             emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALD, (sample & 0xFF) << 8);
             sample >>= 8;
             dst_now++;
+        } else while (sampleCount-- > 0) {
+            emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALD, (sample & 0xFF) << 8);
+            sample >>= 8;
         }
 
         src_now   += currentCount;
         count_now -= currentCount;
     }
-    RASTER(0,0,0);
 
     // check if 16bit samples enabled
     if ((gus_state.emuflags & GUSEMU_16BIT_SAMPLES) == 0) return 0;
@@ -71,16 +72,16 @@ uint32_t gusemu_dma_upload_block(uint32_t dst, uint8_t* src, uint32_t count, uin
         // read by 4 bytes, this will slow things down on misaligned addresses but I don't care
         uint32_t sample = (*(uint32_t*)src_now) ^ xormask;
 
-        // NOTE - flush write buffer for every byte transferred, because DRAM upload time depends
-        // on channel count allocated for DRAM, and apparently EMU8000 can't hold IOCHRDY too
-        // long while write buffer full, due to ISA refresh cycles
         uint32_t sampleCount = currentCount >> 1;
-        while (sampleCount--) {
+        if (gus_state.emuflags & GUSEMU_SLOW_DRAM) while (sampleCount-- > 0) {
             emu8k_waitForWriteFlush(emu8k_state.iobase);
             emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, gus_state.mem8start + dst_now);
             emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALD, sample & 0xFFFF);
             sample >>= 16;
             dst_now++;
+        } else while (sampleCount-- > 0) {
+            emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALD, sample & 0xFFFF);
+            sample >>= 16;
         }
 
         src_now   += currentCount;
@@ -164,11 +165,18 @@ uint32_t gusemu_dma_start() {
     // reset DMA Enable bit
     gus_state.gf1regs.dmactrl.h &= ~(1 << 0);
 
-#if 0  // this should be done by IRQ emulation handler, except for the instant timer IRQ case
-    // set DMA terminal count shadow bit
-    gus_state.gf1regs.dmactrl.l |=  (1 << 6);
-#endif
+    // this should be done by IRQ emulation handler, except for the instant timer IRQ case
+    if ((gus_state.emuflags & GUSEMU_TIMER_MODE_MASK) == GUSEMU_TIMER_INSTANT) {
+        // set DMA terminal count shadow bit
+        gus_state.gf1regs.dmactrl.l |= (1 << 6);
 
-    // TODO: schedule IRQ if requested
+        // throw an IRQ
+        if (gus_state.gf1regs.dmactrl.h & (1 << 5)) {
+            bool do_irq = (gus_state.irqstatus == 0);
+            gusemu_update_irq_status();
+            if (do_irq) gusemu_send_irq();
+        }
+    } // else schedule IRQ interrupt (to emulate DMA in progress and fix possible race conditions)
+
     return GUSEMU_DMA_OK;
 }

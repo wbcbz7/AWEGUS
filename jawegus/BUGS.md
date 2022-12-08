@@ -37,3 +37,4 @@ there are lots of bugs :D
   * upd: ALRIGHT i broke it again :( most samples are cut off early, have absolutely no idea why
 * [Psychic Flight/Spirit](https://www.pouet.net/prod.php?which=41739) - uses OUTSB with ES segment override to upload samples, crashes with GPF
   * upd: Jemm can't handle segment overrides on string I/O, oops
+* CapaMod: no timer + no DMA mode works awesome, DMA + no timer hangs on sample upload

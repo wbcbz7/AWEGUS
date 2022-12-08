@@ -124,12 +124,14 @@
         - enable 16bit samples support
           note it requires 1.5x more sound RAM, so 4 MB or more is recommended
           will work on 2 MB, but GUS RAM size is limited to 512 kB
-          also needs to upload each sample twice, increasing uploading time
+          also increasing uploading time, because the enulation has to upload
+          same sample twice (first as 8 bit expanded to 16 and as full 16 bit)
     -m, --mono  
         - force mono panning
-    -s, --slowdram 
-        - disable DRAM write position auto increment
-          for now has no effect, as DRAM autoincrement is disabled anyway
+    -s, --slowdram (NOTE: ENABLED BY DEFAULT DUE TO SAMPLE CORRUPTION)
+        - disable DRAM write position autoincrement. affects both 3x7 and DMA
+          enable this if you have encountered issues with ISA memory refresh
+          or sample data corruption
     -i[x], --irq=[x]
         - enable IRQ emulation, x: (TO BE IMPLEMENTED)
             0 - use SB16 in dummy playback mode (default)
@@ -138,7 +140,6 @@
           see "IRQ emulation" section below for more info
     -d,  --dma
         - enable DMA emulation (HIGHLY EXPERIMENTAL!) (TO BE IMPLEMENTED)
-
     --mem=[x]
         - limit GUS ram size to x kb, rounded down to nearest power of two
  

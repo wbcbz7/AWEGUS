@@ -138,6 +138,9 @@ enum {
     // use mono panning
     GUSEMU_MONO_PANNING     = (1 << 11),
 
+    // "slow DRAM" mode
+    GUSEMU_SLOW_DRAM        = (1 << 12),
+
     // -------------------
     // gus is muted
     GUSEMU_STATE_MUTED      = (1 << 31),
@@ -325,6 +328,9 @@ uint32_t __trapcall gusemu_debug_w8_trap(uint32_t port, uint32_t data, uint32_t 
 // ----------------
 void gusemu_gf1_write(uint32_t reg, uint32_t ch, uint32_t data);
 uint32_t gusemu_gf1_read(uint32_t reg, uint32_t ch);
+
+uint32_t gusemu_update_irq_status();
+void gusemu_send_irq();
 
 // channel update flags
 enum {

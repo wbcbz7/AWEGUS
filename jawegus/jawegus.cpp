@@ -45,10 +45,11 @@ cmdline_params_t cmdline_params[] = {
     {'?', CMD_FLAG_BOOL,    "HELP",     &cmdflags.help, 0},
     {'H', CMD_FLAG_BOOL,    "HELP",     &cmdflags.help, 0},
     {'S', CMD_FLAG_BOOL,    "SLOWDRAM", &gusemu_cmdline.slowdram, 0},
-    {'M', CMD_FLAG_BOOL,    "MONO",     &gusemu_cmdline.mono, 0},
     {'W', CMD_FLAG_BOOL,    "16BIT",    &gusemu_cmdline.en16bit, 0},
     {0,   CMD_FLAG_INT,     "MEM",      &cmdflags.dramsize, 0},
+    {'M', CMD_FLAG_BOOL,    "MONO",     &gusemu_cmdline.mono, 0},
     {'D', CMD_FLAG_BOOL,    "DMA",      &gusemu_cmdline.dmaemu, 0},
+    {'I', CMD_FLAG_INT,     "IRQ",      &gusemu_cmdline.irqemu, 0},
 };
 
 // --------------
@@ -179,9 +180,12 @@ int install(char *cmdline) {
     }
 
     // set data flags
-    if (gusemu_cmdline.en16bit) init_data.emuflags |= GUSEMU_16BIT_SAMPLES;
-    if (gusemu_cmdline.mono)    init_data.emuflags |= GUSEMU_MONO_PANNING;
-    if (gusemu_cmdline.dmaemu)  init_data.emuflags |= GUSEMU_EMULATE_DMA;
+    if (gusemu_cmdline.en16bit)     init_data.emuflags |= GUSEMU_16BIT_SAMPLES;
+    if (gusemu_cmdline.mono)        init_data.emuflags |= GUSEMU_MONO_PANNING;
+  /*if (gusemu_cmdline.slowdram)*/  init_data.emuflags |= GUSEMU_SLOW_DRAM;
+    if (gusemu_cmdline.dmaemu)      init_data.emuflags |= GUSEMU_EMULATE_DMA;
+
+
 
     // init emulation
     if (gusemu_init(&init_data) == 0) {

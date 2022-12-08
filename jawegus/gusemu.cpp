@@ -27,7 +27,7 @@ void gusemu_emu8k_reset() {
     // reset EMU8000
     //emu8k_hwinit(emu8k_state.iobase);
     emu8k_initChannels(emu8k_state.iobase, GUSEMU_MAX_EMULATED_CHANNELS);
-    emu8k_dramEnable(emu8k_state.iobase, true, (gusemu_cmdline.slowdram ? GUSEMU_MAX_EMULATED_CHANNELS : 0));
+    emu8k_dramEnable(emu8k_state.iobase, true, 0);
     emu8k_setFlatEq(emu8k_state.iobase);
     // reset DRAM pointers
     emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALR, EMU8K_DRAM_OFFSET);
@@ -273,22 +273,20 @@ void gusemu_update_active_channel_count() {
     if (newchans > GUSEMU_MAX_EMULATED_CHANNELS) newchans = GUSEMU_MAX_EMULATED_CHANNELS;
 
     // reinit emu8k dram interface
-    if (gusemu_cmdline.slowdram == false) {
-        // wait for pending write flush
-        emu8k_waitForWriteFlush(emu8k_state.iobase);
-        if (newchans > oldchans) for (int ch = oldchans; ch < newchans; ch++) {
-            // stop, mute and deallocate channel
-            emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_PTRX, 0x00000000);
-            emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CPF,  0x00000000);
-            emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CCCA, 0);
-            emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_VTFT, 0x0000FFFF);
-            emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CVCF, 0x0000FFFF);
-            emu8k_state.chan[ch].flags |= EMUSTATE_CHAN_INVALID_POS;
-        }
-        emu8k_dramEnable(emu8k_state.iobase, true, newchans);
-        for (int ch = newchans; ch < 32; ch++) {
-            emu8k_state.chan[ch].flags |= EMUSTATE_CHAN_INVALID_POS;
-        }
+    // wait for pending write flush
+    emu8k_waitForWriteFlush(emu8k_state.iobase);
+    if (newchans > oldchans) for (int ch = oldchans; ch < newchans; ch++) {
+        // stop, mute and deallocate channel
+        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_PTRX, 0x00000000);
+        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CPF,  0x00000000);
+        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CCCA, 0);
+        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_VTFT, 0x0000FFFF);
+        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CVCF, 0x0000FFFF);
+        emu8k_state.chan[ch].flags |= EMUSTATE_CHAN_INVALID_POS;
+    }
+    emu8k_dramEnable(emu8k_state.iobase, true, newchans);
+    for (int ch = newchans; ch < 32; ch++) {
+        emu8k_state.chan[ch].flags |= EMUSTATE_CHAN_INVALID_POS;
     }
 
     // save new active channels count
@@ -428,7 +426,7 @@ uint32_t gusemu_update_irq_status() {
     // more irqs!
     if (gus_state.timer.flags & GUSEMU_TIMER_T1_IRQ) irqstatus_2x6 |= (1 << 2); // timer 1
     if (gus_state.timer.flags & GUSEMU_TIMER_T2_IRQ) irqstatus_2x6 |= (1 << 3); // timer 2
-    if (gus_state.gf1regs.dmactrl.h & (1 << 7))      irqstatus_2x6 |= (1 << 7); // DMA complete
+    if (gus_state.gf1regs.dmactrl.l & (1 << 6))      irqstatus_2x6 |= (1 << 7); // DMA complete
 
     // save irq masks
     gus_state.irqstatus         = irqstatus_2x6;
@@ -858,7 +856,7 @@ uint32_t gusemu_gf1_read(uint32_t reg, uint32_t ch) {
         // global
         case 0x41: // DRAM DMA Control
             // report DRAM TC in bit 6, then acknowledge and clear it
-            data = (gus_state.gf1regs.dmactrl.w & 0xBF00) | ((gus_state.gf1regs.dmactrl.w << 8) & 0x4000);
+            data = (gus_state.gf1regs.dmactrl.w & 0xBF00) | ((gus_state.gf1regs.dmactrl.l & 0x40) << 8);
             gus_state.gf1regs.dmactrl.l &= ~(1 << 6); 
             break;
         case 0x49: // Sampling Control
@@ -1018,13 +1016,14 @@ uint32_t __trapcall gusemu_3x7_w8_trap (uint32_t port, uint32_t data, uint32_t f
     if (newwritepos > gus_state.drammask) return 0;
 
     // optimize for sequential writes
-    emu8k_waitForWriteFlush(emu8k_state.iobase);
-    //if ((gusemu_cmdline.slowdram) || (gus_state.dramwritepos != newwritepos)) {
+    if ((gus_state.emuflags & GUSEMU_SLOW_DRAM) || (gus_state.dramwritepos != newwritepos)) {
         gus_state.dramwritepos = newwritepos;
-        emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, gus_state.mem8start + gus_state.dramwritepos);
-    //}
+        emu8k_waitForWriteFlush(emu8k_state.iobase);
+        emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, gus_state.mem8start + newwritepos);
+    }
     // convert to 16 bit
     emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALD, data << 8);
+    gus_state.dramwritepos++;
 
     return data;
 }
