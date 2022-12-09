@@ -5,7 +5,7 @@
 // only async and reentrant functions allowed!
 uint32_t gusemu_timer_irq_callback(Client_Reg_Struc* pcl, void* userPtr) {
     // read current irq status (2x6) register
-    // if it's empty then IRQ is cleared (GF1 won't send new IRQ if previous have not been acknowledged!)
+    // if it's empty then IRQ is cleared (GF1 won't send new IRQ if previous has not been acknowledged!)
     bool empty_2x6 = (gus_state.irqstatus == 0);
     bool do_irq = false;
     bool irq_sent = false;
@@ -23,11 +23,10 @@ uint32_t gusemu_timer_irq_callback(Client_Reg_Struc* pcl, void* userPtr) {
     do_irq = (gusemu_update_irq_status() != 0);
 
     // send IRQ if previous 2x6 is empty, use current client context
-    if (true/*do_irq*/) irq_sent = gusemu_send_irq(pcl); // HACK!!!
+    if (empty_2x6 && do_irq) irq_sent = gusemu_send_irq(pcl);
 
     // if IRQ has been sent, assume client did acknowledged it, else ask timer to ack it manually
-    outp(0x20, 0x20);   // REMOVE ME AFTER TIMER TESTS, WILL CAUSE OTHER IRQs GONE MISSING
-    return 0;
+    return irq_sent ? 1 : 0;
 }
 
 // send IRQ
@@ -38,19 +37,21 @@ bool gusemu_send_irq(Client_Reg_Struc* pcl) {
     // this means host application can prevent IRQ from being received
     if ((inp(0x21) & (1 << gus_state.irq)) == 0) {
         Client_Reg_Struc *cr = (pcl ?  pcl : Get_Cur_VM_Handle()->CB_Client_Pointer);
-        Begin_Nest_Exec(cr);
-
         // check client IF flag
         if (cr->Client_EFlags & (1 << 9)) {
-            // set, so execute interrupt
+            // clear IF flag, emulating hardware IRQ behavior
+            cr->Client_EFlags &= ~(1 << 9);
+            // execute interrupt
+            Begin_Nest_Exec(cr);
             Exec_Int(cr, gus_state.intr);
             irq_sent = true;
+            // restore IF flag
+            End_Nest_Exec(cr);
+            cr->Client_EFlags |= (1 << 9);
         }
-        
-        End_Nest_Exec(cr);
     }
 
-    // since JEMM lacks IRQ virtualization, if V86/DPMI task runs with 
+    // since JEMM lacks IRQ virtualization, if V86/DPMI task runs with
     // interrupts disabled, there is no possibility to schedule interrupt
     // upon virtual IF being set, emulating 8259A behavior. this means V86
     // task will lose emulated GUS ints during virtual IF being clear :(
@@ -72,7 +73,7 @@ uint32_t gusemu_update_gf1_irq_status() {
         if (gus_state.gf1regs.chan[ch].volctrl.h & (1 << 7)) irqstatus_2x6 |= (1 << 6);
 
         if ((gf1_irqstatus == 0) &&
-            (gus_state.gf1regs.chan[ch].ctrl.h    & (1 << 7)) && 
+            (gus_state.gf1regs.chan[ch].ctrl.h    & (1 << 7)) &&
             (gus_state.gf1regs.chan[ch].volctrl.h & (1 << 7))) {
 
             gf1_irqstatus = (ch & 0x1F) | 0x20;
@@ -96,7 +97,7 @@ uint32_t gusemu_update_irq_status() {
 #if 0   // wave/ramp IRQs are disabled for now and not reported
     irqstatus_2x6 |= gusemu_update_gf1_irq_status();
 #endif
-    
+
     // more irqs!
     if (gus_state.timer.flags & GUSEMU_TIMER_T1_IRQ) irqstatus_2x6 |= (1 << 2); // timer 1
     if (gus_state.timer.flags & GUSEMU_TIMER_T2_IRQ) irqstatus_2x6 |= (1 << 3); // timer 2

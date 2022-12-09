@@ -13,9 +13,7 @@ there are lots of bugs :D
 * DRAM read/write position caching needs to be fixed. disabled for now
 * volume ramping is buggy and effectively doesn't work
   * can be emulated more or less properly via EMU8000 envelope generator, but it will also require log pitch instead of delta (you can't turn pitch envelope off while keeping volume envelope running!)
-* timers are basically detection check stubs (overflow the moment it's unmasked and started)
-* IRQ/DMA is yet to be implemented
-* "slow DRAM" mode (only ch28-29 are used for DRAM access) is broken now (ULTRINIT and ST3 can't detect card)
+* timer IRQ is kind of...working, but not always :)
 
 
 
@@ -23,7 +21,7 @@ there are lots of bugs :D
 
 * GUSPlay applications almost always work fine, with minor whining if samples are not looped properly
 * ..same for MIDAS 0.40a, albeit didn't tested it much
-* Impulse Tracker - one-shot samples are cut after first tick, volume bars are broken
+* Impulse Tracker - one-shot samples are cut after first tick, volume bars are broken. on the other hand, GUS timer works (you need to explicitly provide IRQ in command line to enable GUS timer mode)
 * Scream Tracker 3.x, Second Reality, Unreal/Future Crew (version 1.1 with GUS support) - ~~corrupted samples at 2nd and further module load~~ fine except for minor ultraclick bugs (see below)
   * ~~ST3: load AWEGUS, run ST3, then load any module - plays fine; then, exit from the tracker, run ST3 again - can't detect GUS. running ULTRINIT then running ST3 again didn't help~~
   * upd: ST3 - managed to fix sample corruption but now some channels play wrong samples (some are at +1 octave). must have something with "ultraclick removal" feature?
@@ -37,4 +35,4 @@ there are lots of bugs :D
   * upd: ALRIGHT i broke it again :( most samples are cut off early, have absolutely no idea why
 * [Psychic Flight/Spirit](https://www.pouet.net/prod.php?which=41739) - uses OUTSB with ES segment override to upload samples, crashes with GPF
   * upd: Jemm can't handle segment overrides on string I/O, oops
-* CapaMod: no timer + no DMA mode works awesome, DMA + no timer hangs on sample upload
+* CapaMod: no timer + no DMA mode works awesome, DMA + no timer hangs on sample upload. timer mode still doesn't work

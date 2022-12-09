@@ -248,9 +248,12 @@ int uninstall() {
 
 int __stdcall DllMain(int module, int reason, struct jlcomm *jlcomm) {
     puts(
-        "AWEGUS - Gravis Ultrasound emulator for AWE32/64, Jemm-based, v.0.13\r\n"
-        "by wbcbz7 o9.12.2o22\r\n"
+        "AWEGUS - Gravis Ultrasound emulator for AWE32/64, Jemm-based, v.0.19\r\n"
+        "by wbcbz7 1o.12.2o22\r\n"
     );
+#ifdef EXCEPTION_DEBUG
+    printf("DllMain base: %08X\r\n", &DllMain);
+#endif
     if (reason == DLL_PROCESS_ATTACH) {
         return install(jlcomm->cmd_line);
     }

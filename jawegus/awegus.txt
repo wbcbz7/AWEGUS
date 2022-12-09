@@ -1,6 +1,6 @@
 ﻿alright, here is some hardcore shit
 
-   AWEGUS - Gravis Ultrasound "emulator" for Sound Blaster AWE32/64 v.0.13
+   AWEGUS - Gravis Ultrasound "emulator" for Sound Blaster AWE32/64 v.0.19
             absolutely copyleft (cl) 2o22 Artem Vasilev - wbcbz7
 
  1. wtf?
@@ -18,13 +18,14 @@
   - likewise, clicks can occur on loop end (morphing into buzzes on very short
     loops, like in chiptunes) due to the fact EMU8000 needs more samples at the
     loop end for 3-point interpolation (GF1 uses linear 2-point)
-  - IRQ/DMA are yet to be emulated. GUS timers overflow right after start, that
-    helps to pass some detection checks.
-    Jemm does not provide any API for IRQ/DMA virtualization, at least now.
+  - IRQ emualtion supports Timer IRQ and can use SB16 dummy playback, COM1 or
+    COM2 interrupts as timing source. DMA Terminal Count IRQ coming soon :)
+    wavetable/volume ramp IRQs are not supported
+  - experimental DMA emulation (channels 0-3 only)
   - Timer Data (2x9) and Index (2xA) readback are also emulated to pass some
     more detection checks
   - volume ramping is "emulated" by instant slewing to ramp start/end volume,
-    depending on ramp direction. that will definitely cause clicks in playback.
+    depending on ramp direction. that will definitely cause clicks in playback
     of course it's possible to emulate ramps via EMU8000 envelope generators,
     but this also require logarithmic pitch to be used instead of linear delta
     again, not impossible but will complicate and slow emulation a bit.
@@ -133,17 +134,17 @@
           enable this if you have encountered issues with ISA memory refresh
           or sample data corruption
     -i[x], --irq=[x]
-        - enable IRQ emulation, x: (TO BE IMPLEMENTED)
+        - enable IRQ emulation, x:
             0 - use SB16 in dummy playback mode (default)
             1 - use COM1 at 0x3F8/IRQ4
             2 - use COM2 at 0x2F8/IRQ3
           see "IRQ emulation" section below for more info
     -d,  --dma
-        - enable DMA emulation (HIGHLY EXPERIMENTAL!) (TO BE IMPLEMENTED)
+        - enable DMA emulation (HIGHLY EXPERIMENTAL!)
     --mem=[x]
         - limit GUS ram size to x kb, rounded down to nearest power of two
  
- 6. IRQ emulation (TO BE IMPLEMENTED)
+ 6. IRQ emulation
     some games and demos use GUS timer IRQs to control playback. since EMU8000
     does not have its own timer, we have to use alternative timing sources.
 
@@ -159,17 +160,21 @@
         cases like integrated modem/laptop UARTs. make sure you have nothing
         connected to selected COM port, or unexpected things could happen :)
 
+    if --irq switch is omitted, timer emulation is faked in the way it sends
+    IRQ the moment timer is started, to pass GUS detection checks.
+
     since Jemm doesn't have any IRQ virtualization support, make sure you have
     only one device using same IRQ, and if possible, set GUS emulated IRQ line
     to emulator timer IRQ: i.e. if have SB16 at IRQ5, it's best to set GUS IRQ
     also to 5. Moreover, V86 task may lose emulated GUS interrupts during 
     virtual IF flag cleared period, as it's unsafe to run a virtual IRQ if
-    they are disabled.
+    they are disabled (although Jemm reflects virtual IF to real IF, so IRQs
+    should not have been missed, needs checking and testing!)
 
-    note that only GUS timer and DMA terminal count IRQs are emulated,
-    wavetable/volume ramp IRQs are ignored and never signalled.    
+    note that only timer IRQs are emulated (DMA terminal count coming soon),
+    wavetable/volume ramp IRQs are ignored and never signalled.
 
- 7. DMA emulation (TO BE IMPLEMENTED)
+ 7. DMA emulation (EXPERIMENTAL)
     alas, Jemm doesn't provide DMA virtualization API either, so DMA emulation
     is done by monitoring GF1 DMA control registers. if DMA transfer is started
     AWEGUS reads 8237 and DMA page registers to get buffer address and size.
@@ -181,7 +186,7 @@
 
  7. more stuff
     right now seems to work well with apps using GusPlay by Cascada, other
-    players may still bug a bit or break completely.
+    players may still bug a bit or break completely. see BUGS.md
 
     thanks to Peter De Wachter for ADLIPT sources! without them this little
     emu will not be possible (or rather i won't be bothered making it :)

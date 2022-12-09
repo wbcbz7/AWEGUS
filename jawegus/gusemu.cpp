@@ -64,7 +64,7 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
     gus_state.timer.flags = 0;
     // stop pending DMA stuff (TODO)
     emu8k_state.irqemu.rampmask = emu8k_state.irqemu.wavemask = emu8k_state.irqemu.rollovermask = 0;
-    
+
     // reset DRAM interface emulation
     gus_state.wordlatch.w = 0;
     gus_state.wordlatch_active = 0;
@@ -97,7 +97,7 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
         tiny_memset(emu8k_state.chan + ch, 0, sizeof(emu8k_state.chan[0]));
 
         // reset GUS state
-        
+
         gus_state.gf1regs.chan[ch].ctrl.w       = 0x0100;   // 00: control
         gus_state.gf1regs.chan[ch].ctrl_r.w     = 0x0100;   // 00: control prev
         /*
@@ -211,7 +211,7 @@ uint32_t gusemu_deinit() {
     // uninstall port traps
     iotrap_uninstall(gus_state.iobase);
 
-    // remove IRQ virtualization 
+    // remove IRQ virtualization
     if (gus_state.emuflags & GUSEMU_EMULATE_IRQ) {
         gus_state.timer.dev->stop(gus_state.timer.dev);
         gus_state.timer.dev->done(gus_state.timer.dev);
@@ -253,7 +253,7 @@ uint32_t gusemu_translate_volume(uint32_t gf1vol) {
 // set and translate position
 uint32_t gusemu_translate_pos(uint32_t ch, uint32_t pos) {
     uint32_t emupos;
-    
+
     // translate for 8/16 bit samples
     if ((emu8k_state.chan[ch].flags & EMUSTATE_CHAN_16BIT)) {
         // do that weird GUS 16bit xlat
@@ -272,7 +272,7 @@ uint32_t gusemu_translate_pos(uint32_t ch, uint32_t pos) {
 void gusemu_update_active_channel_count() {
     uint32_t oldchans = emu8k_state.active_channels;
     uint32_t newchans = (gus_state.gf1regs.active_channels & 31) + 1;
-    
+
     // clamp
     if (newchans < 14) newchans = 14;
     if (newchans > GUSEMU_MAX_EMULATED_CHANNELS) newchans = GUSEMU_MAX_EMULATED_CHANNELS;
@@ -319,14 +319,14 @@ void gusemu_process_output_enable() {
         gus_state.emuflags |=  GUSEMU_STATE_MUTED;
         // save current volume and mute channels
         for (int ch = 0 ; ch < emu8k_state.active_channels; ch++) {
-            if ((emu8k_state.chan[ch].flags & EMUSTATE_CHAN_INVALID_POS) == 0) 
+            if ((emu8k_state.chan[ch].flags & EMUSTATE_CHAN_INVALID_POS) == 0)
                 emu8k_state.chan[ch].volume = emu8k_read(emu8k_state.iobase, ch + EMU8K_REG_CVCF) >> 16;
         }
     } else {
         gus_state.emuflags &= ~GUSEMU_STATE_MUTED;
         // restore current volume
         for (int ch = 0 ; ch < emu8k_state.active_channels; ch++) {
-            if ((emu8k_state.chan[ch].flags & EMUSTATE_CHAN_INVALID_POS) == 0) 
+            if ((emu8k_state.chan[ch].flags & EMUSTATE_CHAN_INVALID_POS) == 0)
                 emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CVCF, (emu8k_state.chan[ch].volume << 16) | 0xFFFF);
         }
     }
@@ -374,7 +374,7 @@ bool gusemu_process_timers() {
 
 // calculate divisor for GUS timer value
 uint32_t gusemu_calc_timer_divisor(uint32_t timerfreq, uint32_t gusval) {
-    // timerdiv = timerbase * gusval / gusbase 
+    // timerdiv = timerbase * gusval / gusbase
     return imuldiv(timerfreq, gusval, 12600);
 }
 
@@ -456,9 +456,9 @@ void gusemu_update_timers(uint32_t flags) {
         if (timerdata & (1 << 6))
             // timer 1 adlib mask
             gus_state.timer.flags &= ~GUSEMU_TIMER_T1_ADLIB_UNMASKED;
-        else 
+        else
             gus_state.timer.flags |=  GUSEMU_TIMER_T1_ADLIB_UNMASKED;
-        
+
         if (timerdata & (1 << 5))
             // timer 2 adlib mask
             gus_state.timer.flags &= ~GUSEMU_TIMER_T2_ADLIB_UNMASKED;
@@ -485,7 +485,7 @@ clear_overflow_target:
 
     // init emulation timer
     if (((gus_state.emuflags & GUSEMU_TIMER_MODE_MASK) == GUSEMU_TIMER_IRQ) && (gus_state.timer.dev != 0)) {
-        if (flags & (GUSEMU_TIMER_T1_RUNNING|GUSEMU_TIMER_T2_RUNNING)) {
+        if (gus_state.timer.flags & (GUSEMU_TIMER_T1_RUNNING|GUSEMU_TIMER_T2_RUNNING)) {
             gus_state.timer.dev->start(gus_state.timer.dev);
         } else {
             gus_state.timer.dev->stop (gus_state.timer.dev);
@@ -577,7 +577,7 @@ void gusemu_update_channel(uint32_t ch, uint32_t flags) {
                 // ramp up
                 guschan->volume.w = guschan->ramp_end.w;
             }
-            // request updating volume 
+            // request updating volume
             flags |= GUSEMU_CHAN_UPDATE_VOLUME;
             // mark ramp as finished
             guschan->volctrl.h |= 1;
@@ -608,7 +608,7 @@ void gusemu_update_channel(uint32_t ch, uint32_t flags) {
             flags |= GUSEMU_CHAN_UPDATE_START;
         if ((guschan->ctrl.h & 3) && !(guschan->ctrl_r.h & 3))
             flags |= GUSEMU_CHAN_UPDATE_STOP;
-        
+
         // update positions if 8/16bit changed
         if ((guschan->ctrl.h ^ guschan->ctrl_r.h) & (1 << 2)) {
             if (guschan->ctrl.h & (1 << 2)) {
@@ -650,11 +650,11 @@ void gusemu_update_channel(uint32_t ch, uint32_t flags) {
 
     // stop here if channel is above the limit
     // also do not let emulation to tamper with dram-assigned channels
-    if (ch >= emu8k_state.active_channels) return; 
+    if (ch >= emu8k_state.active_channels) return;
 
     // here be dragons. and bugs. you know :)
     // ---------------------
-    // process positions 
+    // process positions
     uint32_t guschanpos   = (((uint32_t)guschan->pos_high.w   << 7) | (guschan->pos_low.w   >> 9)) & 0xFFFFF;
     uint32_t gusloopstart = (((uint32_t)guschan->start_high.w << 7) | (guschan->start_low.w >> 9)) & 0xFFFFF;
     uint32_t gusloopend   = (((uint32_t)guschan->end_high.w   << 7) | (guschan->end_low.w   >> 9)) & 0xFFFFF;
@@ -691,7 +691,7 @@ void gusemu_update_channel(uint32_t ch, uint32_t flags) {
                 emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_PTRX, (emuchan->freq << 16) | 0);
             }
         }
-        if ((force_update) || (flags & GUSEMU_CHAN_UPDATE_VOLUME)) { 
+        if ((force_update) || (flags & GUSEMU_CHAN_UPDATE_VOLUME)) {
             if (gus_state.emuflags & GUSEMU_STATE_MUTED) {
                 emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_VTFT, 0 | 0xFFFF);
             } else {
@@ -769,11 +769,11 @@ void gusemu_gf1_write(uint32_t reg, uint32_t ch, uint32_t data) {
             break;
         default:
             break;
-        
+
         return;
     }
 
-    if ((reg <= 0x0D) && (ch < 32)) { 
+    if ((reg <= 0x0D) && (ch < 32)) {
         uint32_t update_flags = 0;
         switch (reg) {
             // local
@@ -859,7 +859,7 @@ uint32_t gusemu_gf1_read(uint32_t reg, uint32_t ch) {
         case 0x41: // DRAM DMA Control
             // report DRAM TC in bit 6, then acknowledge and clear it
             data = (gus_state.gf1regs.dmactrl.w & 0xBF00) | ((gus_state.gf1regs.dmactrl.l & 0x40) << 8);
-            gus_state.gf1regs.dmactrl.l &= ~(1 << 6); 
+            gus_state.gf1regs.dmactrl.l &= ~(1 << 6);
             break;
         case 0x49: // Sampling Control
             data = gus_state.gf1regs.recctrl.w;
@@ -869,7 +869,7 @@ uint32_t gusemu_gf1_read(uint32_t reg, uint32_t ch) {
             // you need to set bits 1-2 again to make them effective
             if ((gus_state.gf1regs.reset_r == 0) && (gus_state.gf1regs.reset & 1))
                 data = 1;
-            else 
+            else
                 data = gus_state.gf1regs.reset;
             // reset register is duplicated in both halves
             data = (data << 8) | data;
@@ -911,7 +911,7 @@ uint32_t gusemu_gf1_read(uint32_t reg, uint32_t ch) {
             break;
 
         // unknown
-        default: 
+        default:
             data = 0;
             break;
     }
@@ -941,7 +941,7 @@ uint32_t __trapcall gusemu_3x2_r16_trap(uint32_t port, uint32_t data, uint32_t f
 }
 uint32_t __trapcall gusemu_3x2_w16_trap(uint32_t port, uint32_t data, uint32_t flags) {
     // performance shortcut for apps writing both channel and index by word write to 3x2
-    // real GUS will not respond by asserting IOCS16 and ISA bus controller will break 
+    // real GUS will not respond by asserting IOCS16 and ISA bus controller will break
     // one word transaction to two byte to ports 3x2 (low) and 3x3 (high)
     // but for performance reasons we'll left it that way :)
     gus_state.pagereg.w = data;
@@ -1003,7 +1003,7 @@ uint32_t __trapcall gusemu_3x7_r8_trap (uint32_t port, uint32_t data, uint32_t f
     if (newreadpos > gus_state.drammask) return 0;
 
     emu8k_waitForWriteFlush(emu8k_state.iobase); // TODO: flush only if last access was write
-    emu8k_waitForReadReady(emu8k_state.iobase); 
+    emu8k_waitForReadReady(emu8k_state.iobase);
     emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALR, gus_state.mem8start + newreadpos);
     emu8k_waitForReadReady(emu8k_state.iobase);
     emu8k_read (emu8k_state.iobase, EMU8K_REG_SMALD);
@@ -1048,7 +1048,7 @@ uint32_t __trapcall gusemu_3x7_w8_trap_16bit(uint32_t port, uint32_t data, uint3
         emu8k_waitForWriteFlush(emu8k_state.iobase);
         emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, gus_state.mem16start + (newwritepos >> 1));
         emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALD, gus_state.wordlatch.w);
-        // reset wordlatch 
+        // reset wordlatch
         gus_state.wordlatch_active = 0;
     } else if ((newwritepos & 1) == 0) {
         // fill word latch
@@ -1083,9 +1083,9 @@ uint32_t __trapcall gusemu_2x6_r8_trap(uint32_t port, uint32_t data, uint32_t fl
 // port 2x8/2x9 (timer stuff) trap
 uint32_t __trapcall gusemu_2x8_r8_trap(uint32_t port, uint32_t data, uint32_t flags) {
     uint32_t timerstatus = 0;
-    if (gus_state.timer.flags & (GUSEMU_TIMER_T1_ADLIB_UNMASKED|GUSEMU_TIMER_T1_OVERFLOW))
+    if ((gus_state.timer.flags & (GUSEMU_TIMER_T1_ADLIB_UNMASKED|GUSEMU_TIMER_T1_OVERFLOW)) == (GUSEMU_TIMER_T1_ADLIB_UNMASKED|GUSEMU_TIMER_T1_OVERFLOW))
         timerstatus |= ((1 << 6) | (1 << 7));
-    if (gus_state.timer.flags & (GUSEMU_TIMER_T2_ADLIB_UNMASKED|GUSEMU_TIMER_T2_OVERFLOW))
+    if ((gus_state.timer.flags & (GUSEMU_TIMER_T2_ADLIB_UNMASKED|GUSEMU_TIMER_T2_OVERFLOW)) == (GUSEMU_TIMER_T2_ADLIB_UNMASKED|GUSEMU_TIMER_T2_OVERFLOW))
         timerstatus |= ((1 << 5) | (1 << 7));
     return timerstatus;
 }
@@ -1120,7 +1120,7 @@ uint32_t __trapcall gusemu_2xb_w8_trap(uint32_t port, uint32_t data, uint32_t fl
         // update DMA
         gus_state.dma_2xb = data;
     }
-    
+
     // TODO: reinit IRQ/DMA virtualization
 
     return data;
@@ -1132,7 +1132,7 @@ uint32_t __trapcall gusemu_dummy_trap(uint32_t port, uint32_t data, uint32_t fla
 }
 
 // debug break trap - dumps gusemu state upon assertion
-// data: 
+// data:
 //      00..1F - read channel GF1 state via gusemu_gf1_read (emulate GUS I/O)
 //      20..3F - read channel GF1 state directly
 //      40     - read GF1 global regs   via gusemu_gf1_read (emulate GUS I/O)
