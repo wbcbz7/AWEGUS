@@ -65,9 +65,9 @@ static uint32_t timer_uart_init(void *s, uint32_t flags, irq_timer_resources_t* 
     irq_timer_uart_t *self = (irq_timer_uart_t*)s;
 
     // save resoures
+    self->intr = 0; // used to determine if IRQ emulation has been installed
     self->devinfo = *resources;
     if (self->devinfo.irq > 7) return 1;        // high IRQs are not supported yet
-    self->intr = self->devinfo.irq + 8;
 
     // set time constant
     self->devinfo.rate = 11520;
@@ -84,12 +84,13 @@ static uint32_t timer_uart_init(void *s, uint32_t flags, irq_timer_resources_t* 
     // get IDT
     sidt(&self->idtDesc); self->idt = (pm_gate_descriptor*)self->idtDesc.base;
 
-    // setup IRQ handler
-    gusemu_irq_passup_install(timer_uart_handler, self->idt, self->devinfo.irq, self->intr);
-
     // save IRQ mask, unmask UART interrupt
+    self->intr = self->devinfo.irq + 8;
     self->irqmask = inp(0x21);
     outp(0x21, self->irqmask & ~(1 << self->devinfo.irq));
+
+    // setup IRQ handler
+    gusemu_irq_passup_install(timer_uart_handler, self->idt, self->devinfo.irq, self->intr);
 
     // ok
     return 0;
@@ -116,11 +117,13 @@ static uint32_t timer_uart_done(void *s) {
     // stop the timer
     self->stop(self);
 
-    // restore interrupt
-    gusemu_irq_passup_remove(self->idt, self->intr);
+    if (self->intr != 0) {
+        // restore interrupt
+        gusemu_irq_passup_remove(self->idt, self->intr);
 
-    // mask interrupt back
-    outp(0x21, (self->irqmask & (1 << self->devinfo.irq)) | (inp(0x21) & ~((1 << self->devinfo.irq))));
+        // mask interrupt back
+        outp(0x21, (self->irqmask & (1 << self->devinfo.irq)) | (inp(0x21) & ~((1 << self->devinfo.irq))));
+    }
 
     return 0;
 }

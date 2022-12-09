@@ -7,6 +7,7 @@
 #include "dma.h"
 #include "utils.h"
 #include "console.h"
+#include "irqemu.h"
 
 /*
     DMA emulation works as simple as it could be :D

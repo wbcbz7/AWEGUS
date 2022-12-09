@@ -12,8 +12,8 @@ CFLAGS16 = -ms -s -I=$(INCLUDE)
 LFLAGS   =
 AFLAGS   = -f win32 -l $<.lst
 
-OBJS     = $(TARGET).obj console.obj cmdline.obj jlm.obj utils.obj iotrap.obj gusemu.obj emu8000.obj
-OBJS     = $(OBJS) irqpass.obj irqpassa.obj dma.obj lowlevel.obj tim_sb.obj tim_uart.obj dmaemu.obj
+OBJS     = $(TARGET).obj console.obj cmdline.obj jlm.obj utils.obj iotrap.obj gusemu.obj emu8000.obj dma.obj 
+OBJS     = $(OBJS) irqpass.obj irqpassa.obj lowlevel.obj tim_sb.obj tim_uart.obj dmaemu.obj irqemu.obj
 OBJSTR   = file {$(OBJS)}
 
 STUBOBJS = stub16.obj

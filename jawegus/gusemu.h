@@ -9,7 +9,8 @@
 struct gusemu_init_t {
     uint32_t emuflags;      // emulation flags (see below)
     uint32_t memsize;       // in KBYTES
-    
+    irq_timer_t *timer;     // timer object pointer
+
     // SB16 resources
     uint16_t sbbase;
     uint8_t  sbirq;
@@ -33,6 +34,13 @@ struct gusemu_cmdline_t {
     bool        en16bit;        // enable 16bit samples
     uint32_t    irqemu;         // emulate irq
     bool        dmaemu;         // emulate dma
+};
+
+enum {
+    IRQEMU_MODE_SB16 = 0,
+    IRQEMU_MODE_COM1,
+    IRQEMU_MODE_COM2,
+    IRQEMU_MODE_COUNT
 };
 
 // gus emulation structures
@@ -109,13 +117,6 @@ enum {
     GUSEMU_TIMER_MODE_MASK  = (3 << 2),
     GUSEMU_TIMER_INSTANT    = (0 << 2), // none actually emulated, timer expires instantly and does not restarts
     GUSEMU_TIMER_IRQ        = (1 << 2), // run timer emulation IRQ
-
-    // emulation IRQ source
-    GUSEMU_IRQ_SOURCE_MASK  = (3 << 4),
-    GUSEMU_IRQ_SOURCE_SB16  = (0 << 4), // play silent buffer through SB16 audio
-    GUSEMU_IRQ_SOURCE_COM   = (1 << 4), // (ab)use 8250 UART as programmable timer
-    GUSEMU_IRQ_SOURCE_RTC   = (2 << 4), // run RTC periodical IRQ
-    GUSEMU_IRQ_SOURCE_IRQ0  = (3 << 4), // bruh
 
     // aaand i forgot what i wanted here :)
     // alright
@@ -329,8 +330,14 @@ uint32_t __trapcall gusemu_debug_w8_trap(uint32_t port, uint32_t data, uint32_t 
 void gusemu_gf1_write(uint32_t reg, uint32_t ch, uint32_t data);
 uint32_t gusemu_gf1_read(uint32_t reg, uint32_t ch);
 
-uint32_t gusemu_update_irq_status();
-void gusemu_send_irq();
+// ----------------
+
+// functions exported for IRQ emulation
+// TODO: it's becoming messy!
+
+bool gusemu_process_timers();
+
+// ----------------
 
 // channel update flags
 enum {

@@ -89,10 +89,10 @@ static uint32_t timer_sb_init(void *s, uint32_t flags, irq_timer_resources_t* re
     irq_timer_sb_t *self = (irq_timer_sb_t*)s;
 
     // save resoures
+    self->intr = 0; // used to determine if IRQ emulation has been installed
     self->devinfo = *resources;
     if (self->devinfo.irq > 7) return 1;        // high IRQs are not supported yet
-    self->intr = self->devinfo.irq + 8;
-
+    
     // check if device is available
     if (sbDspReset(self->devinfo.iobase) == false) return 1;
 
@@ -103,7 +103,7 @@ static uint32_t timer_sb_init(void *s, uint32_t flags, irq_timer_resources_t* re
 
     // set time constant
     if (self->devinfo.rate == 0) self->devinfo.rate = 5000;
-    if ((self->timeConstant = sbTimeConstant(self->devinfo.rate)) == 0) return 1;        // unknown rate!
+    if ((self->timeConstant = sbTimeConstant(self->devinfo.rate)) == 0) return 1; // unknown rate!
     sbDspWrite(self->devinfo.iobase, 0x40);
     sbDspWrite(self->devinfo.iobase, self->timeConstant);
 
@@ -114,15 +114,16 @@ static uint32_t timer_sb_init(void *s, uint32_t flags, irq_timer_resources_t* re
     // get IDT
     sidt(&self->idtDesc); self->idt = (pm_gate_descriptor*)self->idtDesc.base;
 
+    // set IRQ mask
+    self->intr = self->devinfo.irq + 8;
+    self->irqmask = inp(0x21);
+    outp(0x21, self->irqmask & ~(1 << self->devinfo.irq));
+
     // setup IRQ handler
     gusemu_irq_passup_install((void*)timer_sb_handler, self->idt, self->devinfo.irq, self->intr);
 
     // setup DMA controller, but don't unmask it yet
     dmaSetup(self->devinfo.dma, self->blockptr, 1, dmaModeRead | dmaModeInc | dmaModeAutoInit | dmaModeSingle);
-
-    // save IRQ mask
-    self->irqmask = inp(0x21);
-    outp(0x21, self->irqmask & ~(1 << self->devinfo.irq));
 
     // ok
     return 0;
@@ -146,17 +147,22 @@ static uint32_t timer_sb_set_callback(void *s, uint32_t (*callback)(Client_Reg_S
 static uint32_t timer_sb_done(void *s) {
     irq_timer_sb_t *self = (irq_timer_sb_t*)s;
 
+    // stop the timer
+    self->stop(self);
+
     // reset SB
     sbDspReset(self->devinfo.iobase);
-    
-    // restore interrupt
-    gusemu_irq_passup_remove(self->idt, self->intr);
 
-    // mask interrupt back
-    outp(0x21, (self->irqmask & (1 << self->devinfo.irq)) | (inp(0x21) & ~((1 << self->devinfo.irq))));
+    if (self->intr != 0) {
+        // restore interrupt
+        gusemu_irq_passup_remove(self->idt, self->intr);
+
+        // mask interrupt back
+        outp(0x21, (self->irqmask & (1 << self->devinfo.irq)) | (inp(0x21) & ~((1 << self->devinfo.irq))));
+    }
 
     // deallocate memory
-    freedosmem(self->dosmemhandle);
+    if (self->dosmemhandle != 0) freedosmem(self->dosmemhandle);
 
     return 0;
 }

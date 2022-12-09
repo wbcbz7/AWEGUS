@@ -15,5 +15,6 @@ void gusemu_irq_passup_install(void *callback, pm_gate_descriptor *idt, uint32_t
 }
 
 void gusemu_irq_passup_remove(pm_gate_descriptor *idt, uint32_t intr) {
-    idt_set(idt, intr, (void __far *)gusemu_irq_passup_oldhandler, PM_SPECIAL_32BIT_INTERRUPT_GATE);
+    if ((void __far *)gusemu_irq_passup_oldhandler != MK_FP(0, 0))
+        idt_set(idt, intr, (void __far *)gusemu_irq_passup_oldhandler, PM_SPECIAL_32BIT_INTERRUPT_GATE);
 }

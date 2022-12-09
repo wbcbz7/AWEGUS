@@ -19,7 +19,7 @@ __declspec(naked) struct cb_s *Get_Cur_VM_Handle() {
   }
 }
 
-__declspec(naked) static void Begin_Nest_Exec(struct Client_Reg_Struc *pcl) {
+__declspec(naked) void Begin_Nest_Exec(struct Client_Reg_Struc *pcl) {
   __asm {
     push ebp
     mov ebp, edi

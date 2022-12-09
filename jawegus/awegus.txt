@@ -1,6 +1,6 @@
 ﻿alright, here is some hardcore shit
 
-   AWEGUS - Gravis Ultrasound "emulator" for Sound Blaster AWE32/64 v.0.12
+   AWEGUS - Gravis Ultrasound "emulator" for Sound Blaster AWE32/64 v.0.13
             absolutely copyleft (cl) 2o22 Artem Vasilev - wbcbz7
 
  1. wtf?
@@ -162,12 +162,12 @@
     since Jemm doesn't have any IRQ virtualization support, make sure you have
     only one device using same IRQ, and if possible, set GUS emulated IRQ line
     to emulator timer IRQ: i.e. if have SB16 at IRQ5, it's best to set GUS IRQ
-    also to 5. Moreover, V86 task will lose emulated GUS interrupts during 
+    also to 5. Moreover, V86 task may lose emulated GUS interrupts during 
     virtual IF flag cleared period, as it's unsafe to run a virtual IRQ if
     they are disabled.
 
-    note that currently only GUS timer IRQs are emulated, wavetable/volume
-    ramp IRQs are ignored and never signalled.    
+    note that only GUS timer and DMA terminal count IRQs are emulated,
+    wavetable/volume ramp IRQs are ignored and never signalled.    
 
  7. DMA emulation (TO BE IMPLEMENTED)
     alas, Jemm doesn't provide DMA virtualization API either, so DMA emulation

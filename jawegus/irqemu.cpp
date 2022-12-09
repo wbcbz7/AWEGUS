@@ -1,0 +1,108 @@
+#include "irqemu.h"
+#include "gusemu.h"
+
+// timer IRQ callback
+// only async and reentrant functions allowed!
+uint32_t gusemu_timer_irq_callback(Client_Reg_Struc* pcl, void* userPtr) {
+    // read current irq status (2x6) register
+    // if it's empty then IRQ is cleared (GF1 won't send new IRQ if previous have not been acknowledged!)
+    bool empty_2x6 = (gus_state.irqstatus == 0);
+    bool do_irq = false;
+    bool irq_sent = false;
+
+    // run timer emulation
+    gusemu_process_timers();
+
+    // run DMA terminal count emulation
+    // TODO
+
+    // run wave/ramp IRQ emualtion
+    // TODO
+
+    // collect IRQ status
+    do_irq = (gusemu_update_irq_status() != 0);
+
+    // send IRQ if previous 2x6 is empty, use current client context
+    if (true/*do_irq*/) irq_sent = gusemu_send_irq(pcl); // HACK!!!
+
+    // if IRQ has been sent, assume client did acknowledged it, else ask timer to ack it manually
+    outp(0x20, 0x20);   // REMOVE ME AFTER TIMER TESTS, WILL CAUSE OTHER IRQs GONE MISSING
+    return 0;
+}
+
+// send IRQ
+bool gusemu_send_irq(Client_Reg_Struc* pcl) {
+    bool irq_sent = false;
+
+    // check if IRQ is unmasked
+    // this means host application can prevent IRQ from being received
+    if ((inp(0x21) & (1 << gus_state.irq)) == 0) {
+        Client_Reg_Struc *cr = (pcl ?  pcl : Get_Cur_VM_Handle()->CB_Client_Pointer);
+        Begin_Nest_Exec(cr);
+
+        // check client IF flag
+        if (cr->Client_EFlags & (1 << 9)) {
+            // set, so execute interrupt
+            Exec_Int(cr, gus_state.intr);
+            irq_sent = true;
+        }
+        
+        End_Nest_Exec(cr);
+    }
+
+    // since JEMM lacks IRQ virtualization, if V86/DPMI task runs with 
+    // interrupts disabled, there is no possibility to schedule interrupt
+    // upon virtual IF being set, emulating 8259A behavior. this means V86
+    // task will lose emulated GUS ints during virtual IF being clear :(
+
+    // upd: seems like Jemm always reflects V86 IF to real one, so it should
+    // not lose interrupts. needs nore testing though!
+
+    return irq_sent;
+}
+
+// query GF1 IRQ status aka reg 0x8F
+// returns accumulated wave+ramp IRQ flags for 2x6
+uint32_t gusemu_update_gf1_irq_status() {
+    uint32_t gf1_irqstatus = 0;
+    uint32_t irqstatus_2x6 = 0;
+
+    for (int ch = 0; ch < 32; ch++) {
+        if (gus_state.gf1regs.chan[ch].ctrl.h    & (1 << 7)) irqstatus_2x6 |= (1 << 5);
+        if (gus_state.gf1regs.chan[ch].volctrl.h & (1 << 7)) irqstatus_2x6 |= (1 << 6);
+
+        if ((gf1_irqstatus == 0) &&
+            (gus_state.gf1regs.chan[ch].ctrl.h    & (1 << 7)) && 
+            (gus_state.gf1regs.chan[ch].volctrl.h & (1 << 7))) {
+
+            gf1_irqstatus = (ch & 0x1F) | 0x20;
+            if (gus_state.gf1regs.chan[ch].ctrl.h    & (1 << 7)) gf1_irqstatus |= (1 << 6);
+            if (gus_state.gf1regs.chan[ch].volctrl.h & (1 << 7)) gf1_irqstatus |= (1 << 7);
+
+            // clear current channel IRQ status (apparently)
+            gus_state.gf1regs.chan[ch].ctrl.h       &= ~(1 << 7);
+            gus_state.gf1regs.chan[ch].volctrl.h    &= ~(1 << 7);
+        }
+    }
+
+    return irqstatus_2x6;
+}
+
+// query IRQ status, returns 2x6 content
+uint32_t gusemu_update_irq_status() {
+    // scan through all channels, collect their IRQ status
+    uint32_t irqstatus_2x6 = 0;
+
+#if 0   // wave/ramp IRQs are disabled for now and not reported
+    irqstatus_2x6 |= gusemu_update_gf1_irq_status();
+#endif
+    
+    // more irqs!
+    if (gus_state.timer.flags & GUSEMU_TIMER_T1_IRQ) irqstatus_2x6 |= (1 << 2); // timer 1
+    if (gus_state.timer.flags & GUSEMU_TIMER_T2_IRQ) irqstatus_2x6 |= (1 << 3); // timer 2
+    if (gus_state.gf1regs.dmactrl.l & (1 << 6))      irqstatus_2x6 |= (1 << 7); // DMA complete
+
+    // save irq masks
+    gus_state.irqstatus         = irqstatus_2x6;
+    return irqstatus_2x6;
+}

@@ -9,6 +9,9 @@
 #include "emu8000.h"
 #include "cmdline.h"
 
+#include "tim_sb.h"
+#include "tim_uart.h"
+
 extern "C" struct vxd_desc_block ddb = {
     0,  /* Next */
     0,  /* Version */
@@ -39,6 +42,11 @@ struct {
     bool     help;
     uint32_t dramsize;
 } cmdflags;
+
+// IRQ emulation method string
+char *irqemu_desc[] = {
+    "SB16", "COM1", "COM2"
+};
 
 // command line info
 cmdline_params_t cmdline_params[] = {
@@ -141,6 +149,7 @@ int install(char *cmdline) {
     tiny_memset(&gusemu_cmdline, 0, sizeof(gusemu_cmdline));
 
     // parse command line
+    gusemu_cmdline.irqemu = -1;
     if (parse_cmdline(cmdline, cmdline_params, sizeof(cmdline_params)/sizeof(cmdline_params[0])) != 0)
         return 0; 
 
@@ -185,7 +194,31 @@ int install(char *cmdline) {
   /*if (gusemu_cmdline.slowdram)*/  init_data.emuflags |= GUSEMU_SLOW_DRAM;
     if (gusemu_cmdline.dmaemu)      init_data.emuflags |= GUSEMU_EMULATE_DMA;
 
-
+    // init IRQ emulation info
+    if (gusemu_cmdline.irqemu < IRQEMU_MODE_COUNT) {
+        init_data.emuflags |= GUSEMU_EMULATE_IRQ | GUSEMU_TIMER_IRQ;
+        switch(gusemu_cmdline.irqemu) {
+            case IRQEMU_MODE_SB16:
+                init_data.timer     = (irq_timer_t*)&irq_timer_sb;
+                init_data.timerbase = init_data.sbbase;
+                init_data.timerirq  = init_data.sbirq;
+                init_data.timerdma  = init_data.sbdma;
+                break;
+            case IRQEMU_MODE_COM1:
+                init_data.timer     = (irq_timer_t*)&irq_timer_uart;
+                init_data.timerbase = 0x3F8;
+                init_data.timerirq  = 4;
+                init_data.timerdma  = -1;
+                break;
+            case IRQEMU_MODE_COM2:
+                init_data.timer     = (irq_timer_t*)&irq_timer_uart;
+                init_data.timerbase = 0x2F8;
+                init_data.timerirq  = 3;
+                init_data.timerdma  = -1;
+                break;
+            default: break;
+        }
+    }
 
     // init emulation
     if (gusemu_init(&init_data) == 0) {
@@ -196,6 +229,9 @@ int install(char *cmdline) {
                 init_data.gusbase, init_data.memsize >> 10);
         if (gusemu_cmdline.dmaemu)
             printf("DMA emulation at DMA %d installed\r\n", init_data.gusdma);
+        if (gusemu_cmdline.irqemu < IRQEMU_MODE_COUNT)
+            printf("IRQ emulation at IRQ %d installed, using %s\r\n",
+                init_data.gusirq, irqemu_desc[gusemu_cmdline.irqemu]);
     }
 
     return 1;
@@ -212,8 +248,8 @@ int uninstall() {
 
 int __stdcall DllMain(int module, int reason, struct jlcomm *jlcomm) {
     puts(
-        "AWEGUS - Gravis Ultrasound emulator for AWE32/64, Jemm-based, v.0.12\r\n"
-        "by wbcbz7 o5.12.2o22\r\n"
+        "AWEGUS - Gravis Ultrasound emulator for AWE32/64, Jemm-based, v.0.13\r\n"
+        "by wbcbz7 o9.12.2o22\r\n"
     );
     if (reason == DLL_PROCESS_ATTACH) {
         return install(jlcomm->cmd_line);

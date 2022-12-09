@@ -103,7 +103,7 @@ gusemu_irq_passup_:
         ; restore valid stack frame and jump to old handler
 .not_an_irq:
         pop         eax
-        jmp         dword 0x1234:0x56789ABC
+        jmp         dword 0x0000:0x00000000
 .oldhandler     equ $-6
 
 ;-------------
