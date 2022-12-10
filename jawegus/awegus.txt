@@ -21,7 +21,7 @@
   - IRQ emualtion supports Timer IRQ and can use SB16 dummy playback, COM1 or
     COM2 interrupts as timing source. DMA Terminal Count IRQ coming soon :)
     wavetable/volume ramp IRQs are not supported
-  - experimental DMA emulation (channels 0-3 only)
+  - experimental DMA upload emulation (channels 0-3 only)
   - Timer Data (2x9) and Index (2xA) readback are also emulated to pass some
     more detection checks
   - volume ramping is "emulated" by instant slewing to ramp start/end volume,
@@ -125,8 +125,8 @@
         - enable 16bit samples support
           note it requires 1.5x more sound RAM, so 4 MB or more is recommended
           will work on 2 MB, but GUS RAM size is limited to 512 kB
-          also increasing uploading time, because the enulation has to upload
-          same sample twice (first as 8 bit expanded to 16 and as full 16 bit)
+          also increasing uploading time, because the emulation has to upload
+          same sample twice (first 8 bit expanded to 16, then as full 16 bit)
     -m, --mono  
         - force mono panning
     -s, --slowdram (NOTE: ENABLED BY DEFAULT DUE TO SAMPLE CORRUPTION)
@@ -139,10 +139,10 @@
             1 - use COM1 at 0x3F8/IRQ4
             2 - use COM2 at 0x2F8/IRQ3
           see "IRQ emulation" section below for more info
-    -d,  --dma
+    -d, --dma
         - enable DMA emulation (HIGHLY EXPERIMENTAL!)
     --mem=[x]
-        - limit GUS ram size to x kb, rounded down to nearest power of two
+        - limit GUS ram size to x kb, rounded down to power of two (256-1024k)
  
  6. IRQ emulation
     some games and demos use GUS timer IRQs to control playback. since EMU8000

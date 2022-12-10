@@ -72,7 +72,7 @@ i/o port map:
       8bit regs are implemented as hibyte of 16bit
  (3): idk
  (4): emulates AdLib timers, reads return Status data, writes select registers
- (5): IRQ values: 0:   DO NOT USE (Ch0)/Disabled (Ch1)
+ (5): IRQ values: 0:   NMI (Ch0)/Disabled (Ch1)
                   1-7: IRQ 2/5/3/7/11/12/15
  (6): DMA values: 0:   No DMA, 1-5: DMA 1/3/5/6/7, 6-7: reserved?
 

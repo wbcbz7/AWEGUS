@@ -52,7 +52,7 @@ static void timer_uart_handler(Client_Reg_Struc *pcl) {
 static uint32_t timer_uart_set_divisor(void *s, uint32_t divisor) {
     irq_timer_uart_t *self = (irq_timer_uart_t*)s;
 
-    self->divisor = divisor;
+    self->divisor = divisor == 0 ? 1 : divisor;
     outp (self->devinfo.iobase + 3, 0x83);                   // 8N1, load divisor
     outp (self->devinfo.iobase + 0, self->divisor & 0xFF);   // load divisor
     outp (self->devinfo.iobase + 1, self->divisor >> 8);     // load divisor

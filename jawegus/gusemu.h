@@ -201,10 +201,11 @@ struct gus_state_t {
     // IRQ/DMA control (2xB)
     uint8_t     irq_2xb, dma_2xb; 
 
-    // Timer Control (2x8, currently selected register, read via 2xA)
+    // Timer Index (2x8, currently selected register, read via 2xA)
     uint8_t     timerindex;
     // Timer Data (2x9 reg 0x04)
     uint8_t     timerdata;
+    uint8_t     timerdata_r;    // previous value
     // Timer Data latch (2x9 reg other than 0x04)
     uint8_t     timerlatch;
 

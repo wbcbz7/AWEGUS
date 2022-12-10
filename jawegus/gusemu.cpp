@@ -74,9 +74,9 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
 
     // NOTE: interwave docs mention that not all registers are actually reset
     // reset general registers to defaults
-    gus_state.mixctrl    = 0x03;                // mixctrl, 2x0
-    gus_state.timerindex = 0;                   // timer index, 2x8
-    gus_state.timerdata  = 0;                   // timer data,  2x9
+    gus_state.mixctrl    = 0x03;                        // mixctrl, 2x0
+    gus_state.timerindex = 0;                           // timer index, 2x8
+    gus_state.timerdata  = gus_state.timerdata_r = 0;   // timer data,  2x9
     gus_state.gf1regs.active_channels   = 0xCD; // 14 active channels
     emu8k_state.active_channels         = GUSEMU_MAX_EMULATED_CHANNELS; // to trigger all channels update
 
@@ -338,7 +338,6 @@ bool gusemu_process_timers() {
 
     // process timer 1
     if (gus_state.timer.flags & GUSEMU_TIMER_T1_RUNNING) {
-
         gus_state.timer.t1_pos += gus_state.timer.t1_add;
         if (gus_state.timer.t1_pos & 0x8000) {
             // overflow
@@ -375,7 +374,7 @@ bool gusemu_process_timers() {
 // calculate divisor for GUS timer value
 uint32_t gusemu_calc_timer_divisor(uint32_t timerfreq, uint32_t gusval) {
     // timerdiv = timerbase * gusval / gusbase
-    return imuldiv(timerfreq, gusval, 12600);
+    return imuldiv(timerfreq, gusval, 12500);
 }
 
 void gusemu_init_timer_delta() {
@@ -391,7 +390,7 @@ void gusemu_init_timer_delta() {
         return;
     }
 
-    // timer 1 freq is 12600 hz, timer 2 is 4 times slower
+    // timer 1 freq is 12500 hz, timer 2 is 4 times slower
     uint32_t t1div = (256 - gus_state.gf1regs.timer1count.h);
     uint32_t t2div = (256 - gus_state.gf1regs.timer2count.h) << 2;
 
@@ -417,6 +416,7 @@ void gusemu_init_timer_delta() {
                 gus_state.timer.t1_add = (t2div << 15) / t1div;
                 gus_state.timer.t2_add = 0x8000;
             }
+            break;
         default:
             // alright, both timers are inactive
             gus_state.timer.t1_add = gus_state.timer.t2_add = 0;
@@ -464,6 +464,16 @@ void gusemu_update_timers(uint32_t flags) {
             gus_state.timer.flags &= ~GUSEMU_TIMER_T2_ADLIB_UNMASKED;
         else
             gus_state.timer.flags |=  GUSEMU_TIMER_T2_ADLIB_UNMASKED;
+
+        // init emulation timer
+        if (((gus_state.emuflags & GUSEMU_TIMER_MODE_MASK) == GUSEMU_TIMER_IRQ) &&
+            (gus_state.timer.dev != 0)) {
+            if (gus_state.timer.flags & (GUSEMU_TIMER_T1_RUNNING|GUSEMU_TIMER_T2_RUNNING)) {
+                gus_state.timer.dev->start(gus_state.timer.dev);
+            } else {
+                gus_state.timer.dev->stop (gus_state.timer.dev);
+            }
+        }
     }
 
 clear_overflow_target:
@@ -481,15 +491,6 @@ clear_overflow_target:
     // initialize timer variables
     if (flags & (GUSEMU_TIMER_UPDATE_T1COUNT|GUSEMU_TIMER_UPDATE_T2COUNT)) {
         gusemu_init_timer_delta();
-    }
-
-    // init emulation timer
-    if (((gus_state.emuflags & GUSEMU_TIMER_MODE_MASK) == GUSEMU_TIMER_IRQ) && (gus_state.timer.dev != 0)) {
-        if (gus_state.timer.flags & (GUSEMU_TIMER_T1_RUNNING|GUSEMU_TIMER_T2_RUNNING)) {
-            gus_state.timer.dev->start(gus_state.timer.dev);
-        } else {
-            gus_state.timer.dev->stop (gus_state.timer.dev);
-        }
     }
 
     // process timers if instant timer emulation mode
@@ -740,7 +741,7 @@ void gusemu_gf1_write(uint32_t reg, uint32_t ch, uint32_t data) {
         case 0x44: // DRAM I/O Address (4'b0, A[19:16])
             gus_state.gf1regs.dramhigh.w = data & 0x0F00;
             break;
-        case 0x45: // Timer Control
+        case 0x45: // Timer IRQ Control
             gus_state.gf1regs.timerctrl.w = data & 0x0C00;
             gusemu_update_timers(GUSEMU_TIMER_UPDATE_TIMERCTRL);
             break;
@@ -1095,6 +1096,7 @@ uint32_t __trapcall gusemu_2x8_w8_trap(uint32_t port, uint32_t data, uint32_t fl
 }
 uint32_t __trapcall gusemu_2x9_w8_trap(uint32_t port, uint32_t data, uint32_t flags) {
     if (gus_state.timerindex == 0x04) {
+        gus_state.timerdata_r = gus_state.timerdata;
         gus_state.timerdata = data;
         gusemu_update_timers(GUSEMU_TIMER_UPDATE_TIMERDATA);
     } else {
@@ -1113,12 +1115,41 @@ uint32_t __trapcall gusemu_2xa_r8_trap(uint32_t port, uint32_t data, uint32_t fl
 
 // port 2xB (IRQ/DMA Control) trap
 uint32_t __trapcall gusemu_2xb_w8_trap(uint32_t port, uint32_t data, uint32_t flags) {
+    /*
+    (5): IRQ values: 0:   NMI (Ch0)/Disabled (Ch1)
+                      1-7: IRQ 2/5/3/7/11/12/15
+    (6): DMA values: 0:   No DMA, 1-5: DMA 1/3/5/6/7, 6-7: reserved?
+    */
+    
     if (gus_state.mixctrl & 0x40)  {
         // update IRQ
         gus_state.irq_2xb = data;
+        switch (gus_state.irq_2xb & 7) {
+            case  1: gus_state.irq = 9;  gus_state.intr = 0x71;  break;
+            case  2: gus_state.irq = 5;  gus_state.intr = 8 + 5; break;
+            case  3: gus_state.irq = 3;  gus_state.intr = 8 + 3; break;
+            case  4: gus_state.irq = 7;  gus_state.intr = 8 + 7; break;
+#if 0   // TODO: high IRQ support
+            case  5: gus_state.irq = 11; gus_state.intr = 0x73; break;
+            case  6: gus_state.irq = 12; gus_state.intr = 0x74; break;
+            case  7: gus_state.irq = 15; gus_state.intr = 0x7F; break;
+#endif
+            default: break;
+        }
     } else {
         // update DMA
         gus_state.dma_2xb = data;
+        switch (gus_state.dma_2xb & 7) {
+            case  1: gus_state.dma = 1; break;
+            case  2: gus_state.dma = 3; break;
+#if 0   // TODO: 16bit DMA support
+            case  3: gus_state.dma = 5; break;
+            case  4: gus_state.dma = 6; break;
+            case  5: gus_state.dma = 7; break;
+#endif
+            case  6: gus_state.dma = 0; break;  // interwave only?
+            default: break;
+        }
     }
 
     // TODO: reinit IRQ/DMA virtualization
