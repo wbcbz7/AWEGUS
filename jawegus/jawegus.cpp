@@ -132,8 +132,8 @@ bool get_environment_values() {
         printf("error: GUS emulated IRQ must be 7 or less!\r\n");
         return false;
     }
-    if (init_data.gusdma >= 4) {
-        printf("error: GUS emulated DMA must be 3 or less!\r\n");
+    if ((init_data.gusdma >= 8) && (init_data.gusdma == 4)) {
+        printf("error: GUS emulated DMA must be 7 or less!\r\n");
         return false;
     }
 

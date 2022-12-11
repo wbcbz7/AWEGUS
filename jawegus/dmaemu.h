@@ -11,3 +11,6 @@ enum {
 
 // run DMA emulation
 uint32_t gusemu_dma_start();
+
+// update DMA terminal count IRQ
+void gusemu_update_dma_tc();

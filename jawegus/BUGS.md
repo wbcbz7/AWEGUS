@@ -47,3 +47,8 @@ there are lots of bugs :D
   * yeah [polling loop](https://github.com/joncampbell123/doslib/blob/master/hw/ultrasnd/ultrasnd.c#L473) assumes that timer IRQ bit in 2x6 is always set before IRQ is triggered, checks 2x6 in main loop. actually it may fail on real hardware as well!
   * upd: nope! it doesn't ack timer IRQ at all so 2x6 should reflect IRQ status! so either Jemm really does not reflect V86 IF to real one, or I messed up with timer IRQ code again :D
   * upd2: the latter.
+* Star Control 2: hangs on start.
+  * uses DMA terminal count IRQ. also probably requires 16-bit DMA channel to work
+* [x14/Orange](https://www.pouet.net/prod.php?which=1301) - bombs out to DOS prompt at start, with keyboard locked out. runs more or less fine without emulator but with Jemm loaded
+  * runs in ring0 protected mode. okay :) as it works with Jemm, it supports at least VCPI, and possibly DPMI also.
+  * runs under WinXP as well! (not with GUSemu32 though). so it supports DPMI, and I guess it uses Tran's PMODE.

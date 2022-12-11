@@ -1141,11 +1141,9 @@ uint32_t __trapcall gusemu_2xb_w8_trap(uint32_t port, uint32_t data, uint32_t fl
             switch (gus_state.dma_2xb & 7) {
                 case  1: gus_state.dma = 1; break;
                 case  2: gus_state.dma = 3; break;
-#if 0   // TODO: 16bit DMA support
                 case  3: gus_state.dma = 5; break;
                 case  4: gus_state.dma = 6; break;
                 case  5: gus_state.dma = 7; break;
-#endif
                 case  6: gus_state.dma = 0; break;  // interwave only?
                 default: break;
             }

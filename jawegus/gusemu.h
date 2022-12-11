@@ -162,6 +162,8 @@ enum {
     GUSEMU_TIMER_T2_OVERFLOW        = (1 << 6),
     GUSEMU_TIMER_T2_IRQ             = (1 << 7),
     GUSEMU_TIMER_T2_ADLIB_UNMASKED  = (1 << 8),
+
+    GUSEMU_TIMER_DMA_TC_IRQ_POSTED  = (1 << 9)
 };
 
 // global GUS state
@@ -173,6 +175,7 @@ struct gus_state_t {
     uint16_t    iobase;         // I/O base port
     uint8_t     irq, intr;      // irq - physical GF1/Timer IRQ, intr - corresponding software interrupt number
     uint8_t     dma;            // physical DMA channel
+    uint8_t     dma_tc_delay;   // delay in timer ticks for DMA TC IRQ
 
     // timer emulation data
     struct {

@@ -1,5 +1,6 @@
 #include "irqemu.h"
 #include "gusemu.h"
+#include "dmaemu.h"
 
 // timer IRQ callback
 // only async and reentrant functions allowed!
@@ -14,7 +15,7 @@ uint32_t gusemu_timer_irq_callback(Client_Reg_Struc* pcl, void* userPtr) {
     gusemu_process_timers();
 
     // run DMA terminal count emulation
-    // TODO
+    gusemu_update_dma_tc();
 
     // run wave/ramp IRQ emualtion
     // TODO
