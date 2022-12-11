@@ -179,8 +179,8 @@ register map:
     0x8F       8     r    y    IRQ Status (Voice independent)
            4:0       r    y     Voice #
            5         r    y     Reserved, 1
-           6         r    y     Volume Ramp IRQ Pending
-           7         r    y     Wavetable IRQ Pending
+           6         r    y     Volume Ramp IRQ Pending if 0
+           7         r    y     Wavetable IRQ Pending if 0
 
  notes:
  (1): during 16bit read, returns same data in low and high byte

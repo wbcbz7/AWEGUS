@@ -862,6 +862,9 @@ uint32_t gusemu_gf1_read(uint32_t reg, uint32_t ch) {
             data = (gus_state.gf1regs.dmactrl.w & 0xBF00) | ((gus_state.gf1regs.dmactrl.l & 0x40) << 8);
             gus_state.gf1regs.dmactrl.l &= ~(1 << 6);
             break;
+        case 0x42: // DMA Start Address
+            data = gus_state.gf1regs.dmaaddr.w;
+            break;
         case 0x49: // Sampling Control
             data = gus_state.gf1regs.recctrl.w;
             break;

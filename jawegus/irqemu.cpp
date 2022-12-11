@@ -65,10 +65,10 @@ bool gusemu_send_irq(Client_Reg_Struc* pcl) {
 // query GF1 IRQ status aka reg 0x8F
 // returns accumulated wave+ramp IRQ flags for 2x6
 uint32_t gusemu_update_gf1_irq_status() {
-    uint32_t gf1_irqstatus = 0;
+    uint32_t gf1_irqstatus = 0xE0;
     uint32_t irqstatus_2x6 = 0;
 
-    for (int ch = 0; ch < 32; ch++) {
+    for (int ch = 0; ch < emu8k_state.active_channels; ch++) {
         if (gus_state.gf1regs.chan[ch].ctrl.h    & (1 << 7)) irqstatus_2x6 |= (1 << 5);
         if (gus_state.gf1regs.chan[ch].volctrl.h & (1 << 7)) irqstatus_2x6 |= (1 << 6);
 
@@ -77,8 +77,8 @@ uint32_t gusemu_update_gf1_irq_status() {
             (gus_state.gf1regs.chan[ch].volctrl.h & (1 << 7))) {
 
             gf1_irqstatus = (ch & 0x1F) | 0x20;
-            if (gus_state.gf1regs.chan[ch].ctrl.h    & (1 << 7)) gf1_irqstatus |= (1 << 6);
-            if (gus_state.gf1regs.chan[ch].volctrl.h & (1 << 7)) gf1_irqstatus |= (1 << 7);
+            if (gus_state.gf1regs.chan[ch].ctrl.h    & (1 << 7)) gf1_irqstatus &= ~(1 << 6);
+            if (gus_state.gf1regs.chan[ch].volctrl.h & (1 << 7)) gf1_irqstatus &= ~(1 << 7);
 
             // clear current channel IRQ status (apparently)
             gus_state.gf1regs.chan[ch].ctrl.h       &= ~(1 << 7);
