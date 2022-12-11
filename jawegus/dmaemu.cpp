@@ -15,7 +15,9 @@
     - validate all fields
     - read start address and count from DMA controller
     - if ((count == 0) || (count = 0xFFFF)), ignore transfer
-    - copy data to EMU8K onboard DRAM, yielding periodically for processing IRQs
+    - copy data to EMU8K onboard DRAM, yielding periodically to process IRQs
+    - fake i8237 status TC bit set with 1 byte verify block transfer
+      + set address/count regs to vaules at the end of DMA transfer
     - schedule terminal count IRQ event if requested
 
     fortunately, GUS doesn't have its own DMA Count register, using i8237 TC instead
@@ -31,6 +33,7 @@ uint32_t gusemu_dma_upload_block(uint32_t dst, uint8_t* src, uint32_t count, uin
     // flush stale data and set starting address
     emu8k_waitForWriteFlush(emu8k_state.iobase);
     emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, gus_state.mem8start + dst_now);
+    outpw(emu8k_state.iobase + 0x802, EMU8K_REG_SMALD & 0xFF);
     while (count_now != 0) {
         uint32_t currentCount = (count_now >= 4) ? 4 : count_now;
 
@@ -48,7 +51,8 @@ uint32_t gusemu_dma_upload_block(uint32_t dst, uint8_t* src, uint32_t count, uin
             sample >>= 8;
             dst_now++;
         } else while (sampleCount-- > 0) {
-            emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALD, (sample & 0xFF) << 8);
+            //emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALD, (sample & 0xFF) << 8);
+            outpw(emu8k_state.iobase + 0x400, (sample & 0xFF) << 8);
             sample >>= 8;
         }
 
@@ -67,6 +71,7 @@ uint32_t gusemu_dma_upload_block(uint32_t dst, uint8_t* src, uint32_t count, uin
     // flush stale data and set starting address
     emu8k_waitForWriteFlush(emu8k_state.iobase);
     emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, gus_state.mem16start + dst_now);
+    outpw(emu8k_state.iobase + 0x802, EMU8K_REG_SMALD & 0xFF);
     while (count_now != 0) {
         uint32_t currentCount = (count_now >= 4) ? 4 : count_now;
 
@@ -76,18 +81,21 @@ uint32_t gusemu_dma_upload_block(uint32_t dst, uint8_t* src, uint32_t count, uin
         uint32_t sampleCount = currentCount >> 1;
         if (gus_state.emuflags & GUSEMU_SLOW_DRAM) while (sampleCount-- > 0) {
             emu8k_waitForWriteFlush(emu8k_state.iobase);
-            emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, gus_state.mem8start + dst_now);
+            emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALW, gus_state.mem16start + dst_now);
             emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALD, sample & 0xFFFF);
             sample >>= 16;
             dst_now++;
         } else while (sampleCount-- > 0) {
-            emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALD, sample & 0xFFFF);
+            //emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALD, sample & 0xFFFF);
+            outpw(emu8k_state.iobase + 0x400, sample & 0xFFFF);
             sample >>= 16;
         }
 
         src_now   += currentCount;
         count_now -= currentCount;
     }
+    // flush stale data
+    emu8k_waitForWriteFlush(emu8k_state.iobase);
 
     return 0;
 }
@@ -114,6 +122,8 @@ uint32_t gusemu_dma_upload(uint32_t dst, uint8_t* src, uint32_t count, uint32_t 
         count -= currentCount;
     }
 
+    // flush stale data
+    emu8k_waitForWriteFlush(emu8k_state.iobase);
     return 0;
 }
 
