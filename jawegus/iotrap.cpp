@@ -44,7 +44,7 @@ __declspec(naked) void IOTrapEntry() {
 
 // normalized port addresses
 static uint16_t trappedPorts[] = {
-    0x302, 0x303, 0x304, 0x305, 0x307, 0x200, 0x206, 0x208, 0x209, 0x20B, 0xFFFF
+    0x302, 0x303, 0x304, 0x305, 0x307, 0x200, 0x206, 0x208, 0x209, 0x20B, 0x20F, 0xFFFF
 };
 
 // big dispatch table
@@ -63,7 +63,7 @@ static uint32_t __trapcall (*dispatchTable[])(uint32_t, uint32_t, uint32_t) = {
     // byte write
     // 2x0 - 2xF
     &gusemu_2x0_w8_trap, 0, 0, 0, 0, 0, &gusemu_debug_w8_trap, 0,
-    &gusemu_2x8_w8_trap, &gusemu_2x9_w8_trap, 0, &gusemu_2xb_w8_trap, 0, 0, 0, 0,
+    &gusemu_2x8_w8_trap, &gusemu_2x9_w8_trap, 0, &gusemu_2xb_w8_trap, 0, 0, 0, &gusemu_2xf_w8_trap,
     // 3x0 - 3xF
     0, 0, &gusemu_3x2_w8_trap, &gusemu_3x3_w8_trap, &gusemu_3x4_w8_trap, &gusemu_3x5_w8_trap, 0, &gusemu_3x7_w8_trap,
     0,0,0,0,0,0,0,0,

@@ -29,6 +29,8 @@ struct gusemu_init_t {
 
 // gusemu command line flags
 struct gusemu_cmdline_t {
+    bool        help;           // show help
+    uint32_t    dramsize;       // override DRAM size
     bool        mono;           // force mono panning
     bool        slowdram;       // use ch28-29 only for DRAM access (slooww)
     bool        en16bit;        // enable 16bit samples
@@ -205,16 +207,21 @@ struct gus_state_t {
     // IRQ/DMA control (2xB)
     uint8_t     irq_2xb, dma_2xb; 
 
+    // 2xB Register Select (2xF)
+    uint8_t     sel_2xb;
+
     // Timer Index (2x8, currently selected register, read via 2xA)
     uint8_t     timerindex;
     // Timer Data (2x9 reg 0x04)
     uint8_t     timerdata;
-    uint8_t     timerdata_r;    // previous value
     // Timer Data latch (2x9 reg other than 0x04)
     uint8_t     timerlatch;
 
     // Mix Control Register (2x0)
     uint8_t     mixctrl;
+
+    // IRQ Status Register (2x6)
+    uint8_t     irqstatus;
 
     // Page/Channel Index (3x2) and Register Index (3x3)
     union {
@@ -224,9 +231,6 @@ struct gus_state_t {
         };
         uint16_t w;
     } pagereg;
-
-    // IRQ Status Register (2x6)
-    uint8_t irqstatus;
 
     // --------------------------------
     // helper stuff
@@ -324,6 +328,9 @@ uint32_t __trapcall gusemu_2xa_r8_trap(uint32_t port, uint32_t data, uint32_t fl
 
 // port 2xB (IRQ/DMA Control) trap
 uint32_t __trapcall gusemu_2xb_w8_trap(uint32_t port, uint32_t data, uint32_t flags);
+
+// port 2xF (2xB Register Select) trap
+uint32_t __trapcall gusemu_2xf_w8_trap(uint32_t port, uint32_t data, uint32_t flags);
 
 // dummy trap - block access to i/o ports (writes do nothing, reads return -1)
 uint32_t __trapcall gusemu_dummy_trap(uint32_t port, uint32_t data, uint32_t flags);

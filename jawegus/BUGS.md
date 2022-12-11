@@ -8,8 +8,7 @@ there are lots of bugs :D
   * possible solutions - pad loop end with dummy samples manually, shift loop points for long non-chippy loops, etc...
 * alright, seems you can't touch channels 30-31 at all, they indeed control the DRAM refresh?
   * hack - make ch 31 play through entire memory to keep it refreshed?
-  * apparently DRAM refresh is not the issue here, must be interpolator overflow instead
-* 16 bit samples are not implemented yet
+  * apparently DRAM refresh is not the issue here, must be ~~interpolator overflow~~ DRAM access idiosyncrasies instead
 * DRAM read/write position caching needs to be fixed. disabled for now
 * volume ramping is buggy and effectively doesn't work
   * can be emulated more or less properly via EMU8000 envelope generator, but it will also require log pitch instead of delta (you can't turn pitch envelope off while keeping volume envelope running!)
@@ -38,11 +37,12 @@ there are lots of bugs :D
 * [Psychic Flight/Spirit](https://www.pouet.net/prod.php?which=41739) - uses OUTSB with ES segment override to upload samples, crashes with GPF
   * upd: Jemm can't handle segment overrides on string I/O, oops
 * CapaMod: no timer + no DMA mode works awesome, DMA + no timer ~~hangs on sample upload~~ fixed. timer mode still doesn't work
-  * upd: uses very high timer frequency (~1250 Hz). UART timer goes out of sync :(
+  * upd: uses very high timer frequency (~1250 Hz). ~~UART timer goes out of sync :(~~ fixed
+  * upd: writes IRQ/DMA settings from ULTRASND variable via 2xB, also uses Register Select at 2xF (which is present on Rev 3.4+) to clear all IRQs before start.
   * upd: DMA transfer hangs because the player polls i8237 status register for TC bit set. again the byproduct of missing Jemm's DMA virtualization :)
-  * upd: DMA fixed by doing dummy verify+block transfer solely for filling IC flag in i8237 status reg
+  * upd: DMA fixed by doing dummy verify+block transfer solely for setting TC flag in i8237 status reg
   * timer upd: timer does work, but IRQ status is not acknowledged for unknown reason. at exit, does not stops the timer, only shuts timer IRQs off. *facepalm.jpg*
-    * ignoring 2x6 fixes the issue, but it's not a solution
+    * ignoring 2x6 fixes the issue, but it's not a solution.
 * DOSLIB GUS test.exe: ~~"Timer Readback fail (irqstatus=0x00)" if IRQ emulation is on, passes timer check if emulation is off~~ fixed
   * yeah [polling loop](https://github.com/joncampbell123/doslib/blob/master/hw/ultrasnd/ultrasnd.c#L473) assumes that timer IRQ bit in 2x6 is always set before IRQ is triggered, checks 2x6 in main loop. actually it may fail on real hardware as well!
   * upd: nope! it doesn't ack timer IRQ at all so 2x6 should reflect IRQ status! so either Jemm really does not reflect V86 IF to real one, or I messed up with timer IRQ code again :D

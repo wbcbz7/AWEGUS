@@ -38,10 +38,7 @@ extern "C" struct vxd_desc_block ddb = {
 gusemu_init_t init_data;
 
 // global command line info
-struct {
-    bool     help;
-    uint32_t dramsize;
-} cmdflags;
+gusemu_cmdline_t gusemu_cmdline;
 
 // IRQ emulation method string
 char *irqemu_desc[] = {
@@ -50,11 +47,11 @@ char *irqemu_desc[] = {
 
 // command line info
 cmdline_params_t cmdline_params[] = {
-    {'?', CMD_FLAG_BOOL,    "HELP",     &cmdflags.help, 0},
-    {'H', CMD_FLAG_BOOL,    "HELP",     &cmdflags.help, 0},
+    {'?', CMD_FLAG_BOOL,    "HELP",     &gusemu_cmdline.help, 0},
+    {'H', CMD_FLAG_BOOL,    "HELP",     &gusemu_cmdline.help, 0},
     {'S', CMD_FLAG_BOOL,    "SLOWDRAM", &gusemu_cmdline.slowdram, 0},
     {'W', CMD_FLAG_BOOL,    "16BIT",    &gusemu_cmdline.en16bit, 0},
-    {0,   CMD_FLAG_INT,     "MEM",      &cmdflags.dramsize, 0},
+    {0,   CMD_FLAG_INT,     "MEM",      &gusemu_cmdline.dramsize, 0},
     {'M', CMD_FLAG_BOOL,    "MONO",     &gusemu_cmdline.mono, 0},
     {'D', CMD_FLAG_BOOL,    "DMA",      &gusemu_cmdline.dmaemu, 0},
     {0,   CMD_FLAG_BOOL,    "IRQHACK",  &gusemu_cmdline.ignore_2x6, 0},
@@ -146,7 +143,6 @@ bool get_environment_values() {
 int install(char *cmdline) {
     // init structure
     tiny_memset(&init_data, 0, sizeof(init_data));
-    tiny_memset(&cmdflags, 0, sizeof(cmdflags));
     tiny_memset(&gusemu_cmdline, 0, sizeof(gusemu_cmdline));
 
     // parse command line
@@ -154,7 +150,7 @@ int install(char *cmdline) {
     if (parse_cmdline(cmdline, cmdline_params, sizeof(cmdline_params)/sizeof(cmdline_params[0])) != 0)
         return 0; 
 
-    if (cmdflags.help){
+    if (gusemu_cmdline.help){
         showHelp();
         return 0;
     }
@@ -176,8 +172,8 @@ int install(char *cmdline) {
         puts("error: you must have at least 2048 K of sound DRAM installed to run AWEGUS\r\n");
         return 0;
     }
-    if ((cmdflags.dramsize != 0) && ((cmdflags.dramsize << 10) <= memsize))
-        init_data.memsize = cmdflags.dramsize << 10;
+    if ((gusemu_cmdline.dramsize != 0) && ((gusemu_cmdline.dramsize << 10) <= memsize))
+        init_data.memsize = gusemu_cmdline.dramsize << 10;
     else 
         init_data.memsize = memsize;
     if (gusemu_cmdline.en16bit) init_data.memsize = (init_data.memsize * 2) / 3;

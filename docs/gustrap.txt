@@ -50,7 +50,7 @@ i/o port map:
 
     2xA    7:0  b    r    y    AdLib/Timer Register Index Readback
 
-    2xB         b    w    y    IRQ/DMA Control Register
+    2xB         b    w    y    IRQ/DMA Control Register (2xF == 0)
         IRQ:
            2:0       w    y     Channel 1 IRQ (GF1)                        (5)
            5:3       w    y     Channel 2 IRQ (MIDI)                       (5)
@@ -61,6 +61,12 @@ i/o port map:
            5:3       w    y     Channel 2 DMA                              (6)
            6         w    y     Combine DMAs on the same channel
            7         w    y     Reserved, 0
+
+    2xF        b     w    y     2xB Register Control (Rev3.4+/MAX/IW)
+           7:0                   Register Select:
+                          y      0 - IRQ/DMA control
+                          y      5 - write 0 to 2xB to clear all IRQs
+                          d      6 - Jumper (joystick/MIDI enable)
 
  RW:    r - read, w - write, s - modified by GF1
  trap?: . - no, y - yes, d - yes but return dummy data

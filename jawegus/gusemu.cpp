@@ -14,7 +14,6 @@
 // INTERNAL STATIC GUSEMU STRUCTURES (beware!)
 gus_state_t gus_state;
 gus_emu8k_state_t emu8k_state;
-gusemu_cmdline_t gusemu_cmdline;
 
 // do everything here. really
 
@@ -76,7 +75,8 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
     // reset general registers to defaults
     gus_state.mixctrl    = 0x03;                        // mixctrl, 2x0
     gus_state.timerindex = 0;                           // timer index, 2x8
-    gus_state.timerdata  = gus_state.timerdata_r = 0;   // timer data,  2x9
+    gus_state.timerdata  = 0;                           // timer data,  2x9
+    gus_state.sel_2xb    = 0;                           // 2xB register select, 2xF
     gus_state.gf1regs.active_channels   = 0xCD; // 14 active channels
     emu8k_state.active_channels         = GUSEMU_MAX_EMULATED_CHANNELS; // to trigger all channels update
 
@@ -1100,7 +1100,6 @@ uint32_t __trapcall gusemu_2x8_w8_trap(uint32_t port, uint32_t data, uint32_t fl
 }
 uint32_t __trapcall gusemu_2x9_w8_trap(uint32_t port, uint32_t data, uint32_t flags) {
     if (gus_state.timerindex == 0x04) {
-        gus_state.timerdata_r = gus_state.timerdata;
         gus_state.timerdata = data;
         gusemu_update_timers(GUSEMU_TIMER_UPDATE_TIMERDATA);
     } else {
@@ -1119,45 +1118,53 @@ uint32_t __trapcall gusemu_2xa_r8_trap(uint32_t port, uint32_t data, uint32_t fl
 
 // port 2xB (IRQ/DMA Control) trap
 uint32_t __trapcall gusemu_2xb_w8_trap(uint32_t port, uint32_t data, uint32_t flags) {
-    /*
-    (5): IRQ values: 0:   NMI (Ch0)/Disabled (Ch1)
-                      1-7: IRQ 2/5/3/7/11/12/15
-    (6): DMA values: 0:   No DMA, 1-5: DMA 1/3/5/6/7, 6-7: reserved?
-    */
-
-    if (gus_state.mixctrl & 0x40)  {
-        // update IRQ
-        gus_state.irq_2xb = data;
-        switch (gus_state.irq_2xb & 7) {
-            case  1: gus_state.irq = 9;  gus_state.intr = 0x71;  break;
-            case  2: gus_state.irq = 5;  gus_state.intr = 8 + 5; break;
-            case  3: gus_state.irq = 3;  gus_state.intr = 8 + 3; break;
-            case  4: gus_state.irq = 7;  gus_state.intr = 8 + 7; break;
+    switch (gus_state.sel_2xb & 7) {
+    case 0: // IRQ/DMA Control
+        if (gus_state.mixctrl & 0x40)  {
+            // update IRQ
+            gus_state.irq_2xb = data;
+            switch (gus_state.irq_2xb & 7) {
+                case  1: gus_state.irq = 9;  gus_state.intr = 0x71;  break;
+                case  2: gus_state.irq = 5;  gus_state.intr = 8 + 5; break;
+                case  3: gus_state.irq = 3;  gus_state.intr = 8 + 3; break;
+                case  4: gus_state.irq = 7;  gus_state.intr = 8 + 7; break;
 #if 0   // TODO: high IRQ support
-            case  5: gus_state.irq = 11; gus_state.intr = 0x73; break;
-            case  6: gus_state.irq = 12; gus_state.intr = 0x74; break;
-            case  7: gus_state.irq = 15; gus_state.intr = 0x7F; break;
+                case  5: gus_state.irq = 11; gus_state.intr = 0x73; break;
+                case  6: gus_state.irq = 12; gus_state.intr = 0x74; break;
+                case  7: gus_state.irq = 15; gus_state.intr = 0x7F; break;
 #endif
-            default: break;
-        }
-    } else {
-        // update DMA
-        gus_state.dma_2xb = data;
-        switch (gus_state.dma_2xb & 7) {
-            case  1: gus_state.dma = 1; break;
-            case  2: gus_state.dma = 3; break;
+                default: break;
+            }
+        } else {
+            // update DMA
+            gus_state.dma_2xb = data;
+            switch (gus_state.dma_2xb & 7) {
+                case  1: gus_state.dma = 1; break;
+                case  2: gus_state.dma = 3; break;
 #if 0   // TODO: 16bit DMA support
-            case  3: gus_state.dma = 5; break;
-            case  4: gus_state.dma = 6; break;
-            case  5: gus_state.dma = 7; break;
+                case  3: gus_state.dma = 5; break;
+                case  4: gus_state.dma = 6; break;
+                case  5: gus_state.dma = 7; break;
 #endif
-            case  6: gus_state.dma = 0; break;  // interwave only?
-            default: break;
+                case  6: gus_state.dma = 0; break;  // interwave only?
+                default: break;
+            }
         }
+        break;
+    case 5: // "Write a 0 to clear IRQs on power-up" 
+        if (data == 0) gus_state.irqstatus = 0;
+        break;
+    default: break;
     }
 
     // TODO: reinit IRQ/DMA virtualization
 
+    return data;
+}
+
+// port 2xF (2xB Register Select) trap
+uint32_t __trapcall gusemu_2xf_w8_trap(uint32_t port, uint32_t data, uint32_t flags) {
+    gus_state.sel_2xb = data;
     return data;
 }
 
@@ -1172,6 +1179,7 @@ uint32_t __trapcall gusemu_dummy_trap(uint32_t port, uint32_t data, uint32_t fla
 //      20..3F - read channel GF1 state directly
 //      40     - read GF1 global regs   via gusemu_gf1_read (emulate GUS I/O)
 //      41     - read GF1 global regs   directly
+//      42     - read IRQ/DMA settings (2xB), 2xB select (2xF) and IRQ status (2x6)
 uint32_t __trapcall gusemu_debug_w8_trap(uint32_t port, uint32_t data, uint32_t flags) {
     if (data < 0x20) {
         // read GF1 channel registers
@@ -1199,8 +1207,9 @@ uint32_t __trapcall gusemu_debug_w8_trap(uint32_t port, uint32_t data, uint32_t 
             }
             break;
         case 0x42:
-            // read IRQ/DMA settings (2xB)
-            printf("%02X %02X\n", gus_state.irq_2xb, gus_state.dma_2xb);
+            // read IRQ/DMA settings (2xB), 2xB select and IRQ status (2x6)
+            printf("%02X %02X %02X %02X\n",
+                gus_state.irq_2xb, gus_state.dma_2xb, gus_state.sel_2xb, gus_state.irqstatus);
             break;
         default:
             break;
