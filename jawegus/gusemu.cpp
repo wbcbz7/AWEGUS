@@ -257,7 +257,7 @@ uint32_t gusemu_translate_pos(uint32_t ch, uint32_t pos) {
     // translate for 8/16 bit samples
     if ((emu8k_state.chan[ch].flags & EMUSTATE_CHAN_16BIT)) {
         // do that weird GUS 16bit xlat
-        emupos = (pos & 0xC0000) | ((pos >> 1) & 0x1FFFF);
+        emupos = ((pos & 0xC0000) | ((pos & 0x1FFFF) << 1)) >> 1;
         // and add 16bit pool offset
         emupos = (emupos + gus_state.mem16start);
     } else {
@@ -303,14 +303,14 @@ uint32_t gusemu_get_current_pos(uint32_t ch) {
     uint32_t pos = emu8k_read(emu8k_state.iobase, ch + EMU8K_REG_CCCA) & 0x00FFFFFF;
     // translate for 8/16 bit samples
     if ((emu8k_state.chan[ch].flags & EMUSTATE_CHAN_16BIT)) {
-        pos = (pos - gus_state.mem16start);
+        pos = (pos - gus_state.mem16start + 1);
         // do that weird GUS 16bit xlat
-        pos = (pos & 0xC0000) | ((pos << 1) & 0x3FFFF);
+        pos = ((pos & 0x60000) << 1) | (pos & 0x1FFFF);
     } else {
         // no translation required
-        pos -= gus_state.mem8start;
+        pos -= gus_state.mem8start - 1;
     }
-    return pos + 1; // handle emu8k offset
+    return pos; // handle emu8k offset
 };
 
 // process output enable
