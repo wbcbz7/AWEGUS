@@ -22,8 +22,8 @@ there are lots of bugs :D
 
 * GUSPlay applications almost always work fine, with minor whining if samples are not looped properly
 * ..same for MIDAS 0.40a, albeit didn't tested it much
-* Impulse Tracker - one-shot samples are cut after first tick, volume bars are broken. on the other hand, GUS timer works (you need to explicitly provide IRQ in command line to enable GUS timer mode)
-  * upd: ITGUSLO.DRV works, with volume bars broken
+* Impulse Tracker - one-shot samples are cut after first tick, volume bars are broken (only 1st sample is shown correctly). on the other hand, GUS timer works - you need to explicitly provide IRQ in command line to enable GUS timer mode
+  * upd: ITGUSLO.DRV works, volume bars are still broken
 * Scream Tracker 3.x, Second Reality, Unreal/Future Crew (version 1.1 with GUS support) - ~~corrupted samples at 2nd and further module load~~ fine except for minor ultraclick bugs (see below)
   * ~~ST3: load AWEGUS, run ST3, then load any module - plays fine; then, exit from the tracker, run ST3 again - can't detect GUS. running ULTRINIT then running ST3 again didn't help~~
   * upd: ST3 - managed to fix sample corruption but now some channels play wrong samples (some are at +1 octave). must have something with "ultraclick removal" feature?
@@ -38,9 +38,11 @@ there are lots of bugs :D
 * [Psychic Flight/Spirit](https://www.pouet.net/prod.php?which=41739) - uses OUTSB with ES segment override to upload samples, crashes with GPF
   * upd: Jemm can't handle segment overrides on string I/O, oops
 * CapaMod: no timer + no DMA mode works awesome, DMA + no timer ~~hangs on sample upload~~ fixed. timer mode still doesn't work
-  * upd: uses very high timer frequency (~1250 Hz)
+  * upd: uses very high timer frequency (~1250 Hz). UART timer goes out of sync :(
   * upd: DMA transfer hangs because the player polls i8237 status register for TC bit set. again the byproduct of missing Jemm's DMA virtualization :)
-  * upd: fixed by doing dummy verify+block transfer solely for filling IC flag in i8237 status reg
+  * upd: DMA fixed by doing dummy verify+block transfer solely for filling IC flag in i8237 status reg
+  * timer upd: timer does work, but IRQ status is not acknowledged for unknown reason. at exit, does not stops the timer, only shuts timer IRQs off. *facepalm.jpg*
+    * ignoring 2x6 fixes the issue, but it's not a solution
 * DOSLIB GUS test.exe: ~~"Timer Readback fail (irqstatus=0x00)" if IRQ emulation is on, passes timer check if emulation is off~~ fixed
   * yeah [polling loop](https://github.com/joncampbell123/doslib/blob/master/hw/ultrasnd/ultrasnd.c#L473) assumes that timer IRQ bit in 2x6 is always set before IRQ is triggered, checks 2x6 in main loop. actually it may fail on real hardware as well!
   * upd: nope! it doesn't ack timer IRQ at all so 2x6 should reflect IRQ status! so either Jemm really does not reflect V86 IF to real one, or I messed up with timer IRQ code again :D

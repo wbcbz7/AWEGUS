@@ -72,11 +72,11 @@ uint32_t gusemu_update_gf1_irq_status() {
         if (gus_state.gf1regs.chan[ch].ctrl.h    & (1 << 7)) irqstatus_2x6 |= (1 << 5);
         if (gus_state.gf1regs.chan[ch].volctrl.h & (1 << 7)) irqstatus_2x6 |= (1 << 6);
 
-        if ((gf1_irqstatus == 0) &&
+        if ((gf1_irqstatus == 0xE0) &&
             (gus_state.gf1regs.chan[ch].ctrl.h    & (1 << 7)) &&
             (gus_state.gf1regs.chan[ch].volctrl.h & (1 << 7))) {
 
-            gf1_irqstatus = (ch & 0x1F) | 0x20;
+            gf1_irqstatus = (ch & 0x1F) | 0xE0;
             if (gus_state.gf1regs.chan[ch].ctrl.h    & (1 << 7)) gf1_irqstatus &= ~(1 << 6);
             if (gus_state.gf1regs.chan[ch].volctrl.h & (1 << 7)) gf1_irqstatus &= ~(1 << 7);
 
@@ -101,7 +101,8 @@ uint32_t gusemu_update_irq_status() {
     // more irqs!
     if (gus_state.timer.flags & GUSEMU_TIMER_T1_IRQ) irqstatus_2x6 |= (1 << 2); // timer 1
     if (gus_state.timer.flags & GUSEMU_TIMER_T2_IRQ) irqstatus_2x6 |= (1 << 3); // timer 2
-    if (gus_state.gf1regs.dmactrl.l & (1 << 6))      irqstatus_2x6 |= (1 << 7); // DMA complete
+    if ((gus_state.gf1regs.dmactrl.l & (1 << 6)) && (gus_state.gf1regs.dmactrl.h & (1 << 5)))
+        irqstatus_2x6 |= (1 << 7); // DMA complete
 
     // save irq masks
     gus_state.irqstatus         = irqstatus_2x6;

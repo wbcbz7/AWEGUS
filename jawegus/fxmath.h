@@ -54,5 +54,13 @@ long imuldiv(long x, long y, long z);   // (x * y) / z, 64 bit precision
     " idiv  ecx "     \
     parm [eax] [ebx] [ecx] modify exact [eax edx] value [eax]
    
+long imuldiv16(long x, long y, long z); // (x * (y << 16)) / z, 64 bit precision
+#pragma aux imuldiv16 = \
+    " shl   ebx, 16"  \
+    " imul  ebx "     \
+    " idiv  ecx "     \
+    parm [eax] [ebx] [ecx] modify exact [eax edx] value [eax]
+
+
 #endif   
     

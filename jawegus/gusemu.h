@@ -376,5 +376,6 @@ enum {
 
 // global constants
 enum {
+    GUSEMU_GUS_TIMER_CLOCK          = 12500,
     GUSEMU_MAX_EMULATED_CHANNELS    = 28,
 };

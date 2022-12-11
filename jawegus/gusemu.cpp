@@ -372,9 +372,14 @@ bool gusemu_process_timers() {
 }
 
 // calculate divisor for GUS timer value
-uint32_t gusemu_calc_timer_divisor(uint32_t timerfreq, uint32_t gusval) {
-    // timerdiv = timerbase * gusval / gusbase
-    return imuldiv(timerfreq, gusval, 12500);
+// timer_add = pointer to 1.15fx increment for current timer, used to fix timing issues
+uint32_t gusemu_calc_timer_div_delta(uint32_t timerfreq, uint32_t gusval, uint16_t *timer_add) {
+    // 16.16fx timer divisor
+    uint32_t divadd = imuldiv16(timerfreq, gusval, GUSEMU_GUS_TIMER_CLOCK);
+    if (timer_add != 0) {
+        *timer_add = idiv16(divadd & ~0xFFFF, divadd) >> 1;
+    }
+    return (divadd >> 16);
 }
 
 void gusemu_init_timer_delta() {
@@ -396,25 +401,21 @@ void gusemu_init_timer_delta() {
 
     switch (gus_state.timer.flags & (GUSEMU_TIMER_T1_RUNNING|GUSEMU_TIMER_T2_RUNNING))  {
         case GUSEMU_TIMER_T1_RUNNING:
-            timer->setDivisor(timer, gusemu_calc_timer_divisor(timer->devinfo.rate, t1div));
-            gus_state.timer.t1_add = 0x8000;
+            timer->setDivisor(timer, gusemu_calc_timer_div_delta(timer->devinfo.rate, t1div, &gus_state.timer.t1_add));
             gus_state.timer.t2_add = 0x0000;
             break;
         case GUSEMU_TIMER_T2_RUNNING:
-            timer->setDivisor(timer, gusemu_calc_timer_divisor(timer->devinfo.rate, t2div));
+            timer->setDivisor(timer, gusemu_calc_timer_div_delta(timer->devinfo.rate, t2div, &gus_state.timer.t2_add));
             gus_state.timer.t1_add = 0x0000;
-            gus_state.timer.t2_add = 0x8000;
             break;
         case GUSEMU_TIMER_T1_RUNNING|GUSEMU_TIMER_T2_RUNNING:
             // this one is tricky :) find which timer is faster, and run the slower one via delta accumulator
             if (t1div <= t2div) { // timer1 is faster
-                timer->setDivisor(timer, gusemu_calc_timer_divisor(timer->devinfo.rate, t1div));
-                gus_state.timer.t1_add = 0x8000;
+                timer->setDivisor(timer, gusemu_calc_timer_div_delta(timer->devinfo.rate, t1div, &gus_state.timer.t1_add));
                 gus_state.timer.t2_add = (t1div << 15) / t2div;
             } else { // timer2 is faster
-                timer->setDivisor(timer, gusemu_calc_timer_divisor(timer->devinfo.rate, t2div));
+                timer->setDivisor(timer, gusemu_calc_timer_div_delta(timer->devinfo.rate, t2div, &gus_state.timer.t2_add));
                 gus_state.timer.t1_add = (t2div << 15) / t1div;
-                gus_state.timer.t2_add = 0x8000;
             }
             break;
         default:
