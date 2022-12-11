@@ -159,9 +159,12 @@ uint32_t gusemu_dma_start() {
         i8237_addr = (i8237_addr + i8237_count) & 0xFFFF;
     }
 
-    // write out i8237 register values to fake DMA transfer complete
-    dmaSet8237Address(gus_state.dma, i8237_addr);
-    dmaSet8237Count(gus_state.dma, 0xFFFF);
+    // fake block+verify 1 byte DMA transfer to fill TC bits in i8237 status register
+    dmaSet8237Address(gus_state.dma, i8237_addr - 1);
+    dmaSet8237Count(gus_state.dma, 0);
+    dmaSetMode(gus_state.dma, dmaModeBlock | dmaModeInc | dmaModeVerify);
+    dmaStart(gus_state.dma);
+    dmaRequest(gus_state.dma);  // manually trigger it
 
     // reset DMA Enable bit
     gus_state.gf1regs.dmactrl.h &= ~(1 << 0);

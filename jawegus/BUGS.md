@@ -37,6 +37,7 @@ there are lots of bugs :D
   * upd: Jemm can't handle segment overrides on string I/O, oops
 * CapaMod: no timer + no DMA mode works awesome, DMA + no timer hangs on sample upload. timer mode still doesn't work
   * upd: uses very high timer frequency (~1250 Hz)
+  * upd: DMA transfer hangs because the player polls i8237 status register. again the byproduct of missing Jemm's DMA virtualization :)
 * DOSLIB GUS test.exe: ~~"Timer Readback fail (irqstatus=0x00)" if IRQ emulation is on, passes timer check if emulation is off~~ fixed
   * yeah [polling loop](https://github.com/joncampbell123/doslib/blob/master/hw/ultrasnd/ultrasnd.c#L473) assumes that timer IRQ bit in 2x6 is always set before IRQ is triggered, checks 2x6 in main loop. actually it may fail on real hardware as well!
   * upd: nope! it doesn't ack timer IRQ at all so 2x6 should reflect IRQ status! so either Jemm really does not reflect V86 IF to real one, or I messed up with timer IRQ code again :D

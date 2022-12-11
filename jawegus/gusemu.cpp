@@ -1120,7 +1120,7 @@ uint32_t __trapcall gusemu_2xb_w8_trap(uint32_t port, uint32_t data, uint32_t fl
                       1-7: IRQ 2/5/3/7/11/12/15
     (6): DMA values: 0:   No DMA, 1-5: DMA 1/3/5/6/7, 6-7: reserved?
     */
-    
+
     if (gus_state.mixctrl & 0x40)  {
         // update IRQ
         gus_state.irq_2xb = data;
@@ -1193,6 +1193,10 @@ uint32_t __trapcall gusemu_debug_w8_trap(uint32_t port, uint32_t data, uint32_t 
             for (int i = 0x40; i < 0x49; i++) {
                 printf("%04X ", gus_state.gf1regs.global[data - 0x40].w);
             }
+            break;
+        case 0x42:
+            // read IRQ/DMA settings (2xB)
+            printf("%02X %02X\n", gus_state.irq_2xb, gus_state.dma_2xb);
             break;
         default:
             break;

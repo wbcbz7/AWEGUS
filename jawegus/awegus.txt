@@ -1,6 +1,6 @@
 ﻿alright, here is some hardcore shit
 
-   AWEGUS - Gravis Ultrasound "emulator" for Sound Blaster AWE32/64 v.0.19
+   AWEGUS - Gravis Ultrasound "emulator" for Sound Blaster AWE32/64 v.0.19a
             absolutely copyleft (cl) 2o22 Artem Vasilev - wbcbz7
 
  1. wtf?
