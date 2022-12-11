@@ -6,7 +6,7 @@
 uint32_t gusemu_timer_irq_callback(Client_Reg_Struc* pcl, void* userPtr) {
     // read current irq status (2x6) register
     // if it's empty then IRQ is cleared (GF1 won't send new IRQ if previous has not been acknowledged!)
-    bool empty_2x6 = (gus_state.irqstatus == 0);
+    bool empty_2x6 = (gus_state.emuflags & GUSEMU_IRQ_IGNORE_2X6) || (gus_state.irqstatus == 0);
     bool do_irq = false;
     bool irq_sent = false;
 

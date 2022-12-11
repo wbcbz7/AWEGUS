@@ -57,6 +57,7 @@ cmdline_params_t cmdline_params[] = {
     {0,   CMD_FLAG_INT,     "MEM",      &cmdflags.dramsize, 0},
     {'M', CMD_FLAG_BOOL,    "MONO",     &gusemu_cmdline.mono, 0},
     {'D', CMD_FLAG_BOOL,    "DMA",      &gusemu_cmdline.dmaemu, 0},
+    {0,   CMD_FLAG_BOOL,    "IRQHACK",  &gusemu_cmdline.ignore_2x6, 0},
     {'I', CMD_FLAG_INT,     "IRQ",      &gusemu_cmdline.irqemu, 0},
 };
 
@@ -71,13 +72,13 @@ void showHelp() {
         " -?, -h, --help   - this help\r\n"
         " -w, --16bit      - enable 16bit samples (needs 1.5x more DRAM, slower upload)\r\n"
         " -m, --mono       - force mono panning\r\n"
-        " -s, --slowdram   - disable DRAM write position autoincrement\r\n"
         "     --mem=[x]    - limit emulated GUS DRAM to x kbytes\r\n"
         " -i[x], --irq=[x] - enable IRQ emulation, x: \r\n"
         "       0 - use SB16 in dummy playback mode (default)\r\n"
         "       1 - use COM1 at 0x3F8/IRQ4\r\n"
         "       2 - use COM2 at 0x2F8/IRQ3\r\n"
-        " -d,  --dma       - enable DMA emulation (HIGHLY EXPERIMENTAL!)\r\n"
+        " -d, --dma        - enable DMA emulation\r\n"
+        "     --irqhack    - ignore non-zero IRQ status (2x6) and always send IRQ\r\n"
         "\r\n"
     );
 }
@@ -193,6 +194,7 @@ int install(char *cmdline) {
     if (gusemu_cmdline.mono)        init_data.emuflags |= GUSEMU_MONO_PANNING;
   /*if (gusemu_cmdline.slowdram)*/  init_data.emuflags |= GUSEMU_SLOW_DRAM;
     if (gusemu_cmdline.dmaemu)      init_data.emuflags |= GUSEMU_EMULATE_DMA;
+    if (gusemu_cmdline.ignore_2x6)  init_data.emuflags |= GUSEMU_IRQ_IGNORE_2X6;
 
     // init IRQ emulation info
     if (gusemu_cmdline.irqemu < IRQEMU_MODE_COUNT) {
@@ -227,11 +229,11 @@ int install(char *cmdline) {
     } else {
         printf("GUS emulation at port %X installed, %d KB DRAM available\r\n",
                 init_data.gusbase, init_data.memsize >> 10);
-        if (gusemu_cmdline.dmaemu)
-            printf("DMA emulation at DMA %d installed\r\n", init_data.gusdma);
         if (gusemu_cmdline.irqemu < IRQEMU_MODE_COUNT)
             printf("IRQ emulation at IRQ %d installed, using %s\r\n",
                 init_data.gusirq, irqemu_desc[gusemu_cmdline.irqemu]);
+        if (gusemu_cmdline.dmaemu)
+            printf("DMA emulation at DMA %d installed\r\n", init_data.gusdma);
     }
 
     return 1;
@@ -248,7 +250,7 @@ int uninstall() {
 
 int __stdcall DllMain(int module, int reason, struct jlcomm *jlcomm) {
     puts(
-        "AWEGUS - Gravis Ultrasound emulator for AWE32/64, Jemm-based, v.0.19a\r\n"
+        "AWEGUS - Gravis Ultrasound emulator for AWE32/64, Jemm-based, v.0.20beta\r\n"
         "by wbcbz7 11.12.2o22\r\n"
     );
 #ifdef EXCEPTION_DEBUG

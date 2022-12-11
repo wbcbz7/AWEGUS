@@ -34,6 +34,7 @@ struct gusemu_cmdline_t {
     bool        en16bit;        // enable 16bit samples
     uint32_t    irqemu;         // emulate irq
     bool        dmaemu;         // emulate dma
+    bool        ignore_2x6;     // ignore 2x6 and always send IRQ
 };
 
 enum {
@@ -141,6 +142,9 @@ enum {
 
     // "slow DRAM" mode
     GUSEMU_SLOW_DRAM        = (1 << 12),
+
+    // ignore non-zero IRQ status (2x6) in IRQ emualtion
+    GUSEMU_IRQ_IGNORE_2X6   = (1 << 13),
 
     // -------------------
     // gus is muted

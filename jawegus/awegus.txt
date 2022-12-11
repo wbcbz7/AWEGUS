@@ -1,6 +1,6 @@
 ﻿alright, here is some hardcore shit
 
-   AWEGUS - Gravis Ultrasound "emulator" for Sound Blaster AWE32/64 v.0.19a
+  AWEGUS - Gravis Ultrasound "emulator" for Sound Blaster AWE32/64 v.0.20beta
             absolutely copyleft (cl) 2o22 Artem Vasilev - wbcbz7
 
  1. wtf?
@@ -141,6 +141,9 @@
           see "IRQ emulation" section below for more info
     -d, --dma
         - enable DMA emulation (HIGHLY EXPERIMENTAL!)
+        --irqhack
+        - ignore non-zero IRQ status (2x6) and always send an IRQ (HACK!)
+          effective with --irq switch only
     --mem=[x]
         - limit GUS ram size to x kb, rounded down to power of two (256-1024k)
  
