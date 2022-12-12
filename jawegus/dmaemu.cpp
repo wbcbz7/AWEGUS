@@ -193,8 +193,12 @@ uint32_t gusemu_dma_start() {
     } else {
         maxcount = 0x10000; countmask = 0xFFFF;
     }
-    if (dmactrl & 4) dmaaddr = (dmaaddr & 0xC0000) | ((dmaaddr & 0x1FFFF) << 1); // translate GUS DMA address
+
     uint8_t *linsrc = (uint8_t*)((dmapage << 16) + i8237_addr);
+
+    // translate GUS DMA address for 16-bit channels
+    if ((gus_state.dma >= 4) && (dmactrl & 4))
+        dmaaddr = (dmaaddr & 0xC0000) | ((dmaaddr & 0x1FFFF) << 1); 
 
     // run transfers
     if ((((i8237_addr + i8237_count) ^ i8237_addr) & ~countmask) != 0) {

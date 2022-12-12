@@ -49,6 +49,7 @@ there are lots of bugs :D
   * upd2: the latter.
 * Star Control 2: hangs on start.
   * uses DMA terminal count IRQ. also probably requires 16-bit DMA channel to work
+    * implemented both, still hangs
 * [x14/Orange](https://www.pouet.net/prod.php?which=1301) - bombs out to DOS prompt at start, with keyboard locked out. runs more or less fine without emulator but with Jemm loaded
   * runs in ring0 protected mode. okay :) as it works with Jemm, it supports at least VCPI, and possibly DPMI also.
   * runs under WinXP as well! (not with GUSemu32 though). so it supports DPMI, and I guess it uses Tran's PMODE.
