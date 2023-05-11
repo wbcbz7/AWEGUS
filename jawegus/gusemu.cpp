@@ -27,7 +27,7 @@ void gusemu_emu8k_reset() {
     // reset EMU8000
     //emu8k_hwinit(emu8k_state.iobase);
     emu8k_initChannels(emu8k_state.iobase, GUSEMU_MAX_EMULATED_CHANNELS);
-    emu8k_dramEnable(emu8k_state.iobase, true, 0);
+    emu8k_dramEnable(emu8k_state.iobase, true, 0, GUSEMU_MAX_EMULATED_CHANNELS);
     emu8k_setFlatEq(emu8k_state.iobase);
     // reset DRAM pointers
     emu8k_write(emu8k_state.iobase, EMU8K_REG_SMALR, EMU8K_DRAM_OFFSET);
@@ -77,8 +77,12 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
     gus_state.timerindex = 0;                           // timer index, 2x8
     gus_state.timerdata  = 0;                           // timer data,  2x9
     gus_state.sel_2xb    = 0;                           // 2xB register select, 2xF
-    gus_state.gf1regs.active_channels   = 0xCD; // 14 active channels
-    emu8k_state.active_channels         = GUSEMU_MAX_EMULATED_CHANNELS; // to trigger all channels update
+    gus_state.gf1regs.active_channels   = 0xCD;         // 14 active channels
+    emu8k_state.active_channels =                       // to trigger all channels update
+    emu8k_state.max_channels =
+        (gus_state.emuflags & GUSEMU_DISABLE_FM) ? 
+        GUSEMU_MAX_EMULATED_CHANNELS_NOFM :
+        GUSEMU_MAX_EMULATED_CHANNELS; 
 
     // reset GF1 registers
     gus_state.pagereg.w             = 0;
@@ -118,7 +122,7 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
     }
 
     // stop emu8k channels
-    for (int ch = 0; ch < GUSEMU_MAX_EMULATED_CHANNELS; ch++) {
+    for (int ch = 0; ch < emu8k_state.max_channels; ch++) {
         emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_PTRX, 0x00000000);
         emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CPF,  0x00000000);
         emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_VTFT, 0x0000FFFF);
@@ -225,8 +229,8 @@ uint32_t gusemu_deinit() {
 }
 
 // -------------------------------
-
 // update channel state (stopped, etc), trigger IRQs
+// TODO: update this in case of transition to EMU8K envelope engine
 
 // pitch conversion (6.10fx -> (2.14fx << 8))
 #define GF1_EMU8K_PITCH(ch) (154350 << 12) / (ch * 11025)
@@ -240,7 +244,8 @@ static const uint32_t gf1_to_emu8k_pitchtab[] = {
 
 // translate gf1->emu8k pitch, overflow is not handled
 uint32_t gusemu_translate_pitch(uint32_t gf1pitch) {
-    uint32_t chans = (gus_state.gf1regs.active_channels & 31) + 1;
+    //uint32_t chans = (gus_state.gf1regs.active_channels & 31) + 1;
+    uint32_t chans = emu8k_state.active_channels;
     return (gf1pitch * gf1_to_emu8k_pitchtab[chans - 14]) >> 8;
 }
 
@@ -249,6 +254,8 @@ uint32_t gusemu_translate_volume(uint32_t gf1vol) {
     // this one if pretty straightforward, note extra precision
     return (gf1vol == 0) ? 0 : ((4096 + (gf1vol & 0xFFF)) << (gf1vol >> 12)) >> 12; // ugh
 }
+
+// ------------------------------
 
 // set and translate position
 uint32_t gusemu_translate_pos(uint32_t ch, uint32_t pos) {
@@ -275,7 +282,7 @@ void gusemu_update_active_channel_count() {
 
     // clamp
     if (newchans < 14) newchans = 14;
-    if (newchans > GUSEMU_MAX_EMULATED_CHANNELS) newchans = GUSEMU_MAX_EMULATED_CHANNELS;
+    if (newchans > emu8k_state.max_channels) newchans = emu8k_state.max_channels;
 
     // reinit emu8k dram interface
     // wait for pending write flush
@@ -689,8 +696,10 @@ void gusemu_update_channel(uint32_t ch, uint32_t flags) {
             if (guschan->ctrl.w & 3) {
                 // held it stopped
                 emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_PTRX, 0 | 0);
+                emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CPF,  0 | 0);
             } else {
                 emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_PTRX, (emuchan->freq << 16) | 0);
+                emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CPF,  (emuchan->freq << 16) | 0);
             }
         }
         if ((force_update) || (flags & GUSEMU_CHAN_UPDATE_VOLUME)) {
@@ -702,7 +711,7 @@ void gusemu_update_channel(uint32_t ch, uint32_t flags) {
         }
         // reset invalid position flag
         emuchan->flags &= ~EMUSTATE_CHAN_INVALID_POS;
-    } else if (!(emuchan->flags & EMUSTATE_CHAN_INVALID_POS)) {
+    } else if ((emuchan->flags & EMUSTATE_CHAN_INVALID_POS) == 0) {
         // invalid position!
 #if 0
         // save current position if it's not the cause of illegal pos
@@ -714,6 +723,7 @@ void gusemu_update_channel(uint32_t ch, uint32_t flags) {
 #endif
         // then mute and stop channel
         emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_PTRX, 0);
+        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CPF,  0);
         emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_VTFT, 0x0000FFFF);   // leave filter always off
         // mark channel as invalid position
         emuchan->flags |= EMUSTATE_CHAN_INVALID_POS;

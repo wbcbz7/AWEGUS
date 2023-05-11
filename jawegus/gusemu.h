@@ -37,6 +37,7 @@ struct gusemu_cmdline_t {
     uint32_t    irqemu;         // emulate irq
     bool        dmaemu;         // emulate dma
     bool        ignore_2x6;     // ignore 2x6 and always send IRQ
+    bool        disable_fm;     // disable FM passthru, add channels 30-31 to the pool
 };
 
 enum {
@@ -121,9 +122,6 @@ enum {
     GUSEMU_TIMER_INSTANT    = (0 << 2), // none actually emulated, timer expires instantly and does not restarts
     GUSEMU_TIMER_IRQ        = (1 << 2), // run timer emulation IRQ
 
-    // aaand i forgot what i wanted here :)
-    // alright
-
     // emulate 16bit samples in addition to 8bit
     GUSEMU_16BIT_SAMPLES    = (1 << 6),
 
@@ -147,6 +145,9 @@ enum {
 
     // ignore non-zero IRQ status (2x6) in IRQ emualtion
     GUSEMU_IRQ_IGNORE_2X6   = (1 << 13),
+
+    // disable FM passthrough
+    GUSEMU_DISABLE_FM       = (1 << 14),
 
     // -------------------
     // gus is muted
@@ -276,6 +277,8 @@ struct gus_emu8k_state_t {
 
     // real active channels count
     uint32_t active_channels;
+    // maximum active channels permitted
+    uint32_t max_channels;
 };
 
 // ----------------
@@ -390,6 +393,7 @@ enum {
 
 // global constants
 enum {
-    GUSEMU_GUS_TIMER_CLOCK          = 12500,
-    GUSEMU_MAX_EMULATED_CHANNELS    = 28,
+    GUSEMU_GUS_TIMER_CLOCK              = 12500,
+    GUSEMU_MAX_EMULATED_CHANNELS        = 28,
+    GUSEMU_MAX_EMULATED_CHANNELS_NOFM   = 30,
 };

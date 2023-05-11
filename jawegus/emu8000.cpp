@@ -34,9 +34,9 @@ void emu8k_hwinit(uint32_t iobase) {
     emu8k_write(iobase, EMU8K_REG_HWCF6, 0x8000);
 }
 
-void emu8k_dramEnable(uint32_t iobase, bool readWrite, uint32_t startChannel) {
+void emu8k_dramEnable(uint32_t iobase, bool readWrite, uint32_t startChannel, uint32_t channels) {
     // allocate even channels for read, odd for write
-    for (int ch = startChannel; ch < 30; ch++) {
+    for (int ch = startChannel; ch < (channels - startChannel); ch++) {
         emu8k_write(iobase, ch + EMU8K_REG_DCYSUSV, 0x0080);
         emu8k_write(iobase, ch + EMU8K_REG_VTFT,    0);
         emu8k_write(iobase, ch + EMU8K_REG_CVCF,    0);
@@ -46,6 +46,22 @@ void emu8k_dramEnable(uint32_t iobase, bool readWrite, uint32_t startChannel) {
         emu8k_write(iobase, ch + EMU8K_REG_CPF,     0x40000000);
         emu8k_write(iobase, ch + EMU8K_REG_CCCA,    ((ch & 1) && (readWrite)) ? 0x04000000 : 0x06000000);
     }
+}
+
+void emu8k_dramDisable(uint32_t iobase, uint32_t startChannel, uint32_t channels) {
+    // wait for stale data
+    emu8k_waitForWriteFlush(iobase);
+
+    // deallocate channels
+    for (int ch = startChannel; ch < (channels - startChannel); ch++) { {
+        emu8k_write(iobase, ch + EMU8K_REG_PTRX, 0);
+        emu8k_write(iobase, ch + EMU8K_REG_CPF,  0);
+        emu8k_write(iobase, ch + EMU8K_REG_VTFT, 0);
+        emu8k_write(iobase, ch + EMU8K_REG_CVCF, 0);
+        emu8k_write(iobase, ch + EMU8K_REG_CCCA, 0);        // disable memory access last
+    }
+
+    // don't touch envelope generator, leave it disabled
 }
 
 // 0 if timeout, non-0 if done
@@ -64,22 +80,6 @@ int emu8k_waitForReadReady(uint32_t iobase) {
     while ((--timeout != 0) && ((emu8k_read(iobase, EMU8K_REG_SMALR) & (1 << 31)) != 0));
     
     return timeout;
-}
-
-void emu8k_dramDisable(uint32_t iobase) {
-    // wait for stale data
-    emu8k_waitForWriteFlush(iobase);
-
-    // deallocate channels
-    for (int ch = 0; ch < 30; ch++) {
-        emu8k_write(iobase, ch + EMU8K_REG_PTRX, 0);
-        emu8k_write(iobase, ch + EMU8K_REG_CPF,  0);
-        emu8k_write(iobase, ch + EMU8K_REG_VTFT, 0);
-        emu8k_write(iobase, ch + EMU8K_REG_CVCF, 0);
-        emu8k_write(iobase, ch + EMU8K_REG_CCCA, 0);        // disable memory access last
-    }
-
-    // don't touch envelope generator, leave it disabled
 }
 
 int emu8k_probe(uint32_t iobase) {
@@ -178,15 +178,15 @@ int emu8k_initChannels(uint32_t iobase, uint32_t channels, uint32_t startChannel
         // init envelope generator
         emu8k_write(iobase, ch + EMU8K_REG_DCYSUSV,  0x0080); // disable envelope generator
         if (initEnvelope) {
-            emu8k_write(iobase, ch + EMU8K_REG_ENVVOL,   0x0000);
-            emu8k_write(iobase, ch + EMU8K_REG_ENVVAL,   0x0000);
-            emu8k_write(iobase, ch + EMU8K_REG_DCYSUS,   0x0000);
-            emu8k_write(iobase, ch + EMU8K_REG_ATKHLDV,  0x0000);
-            emu8k_write(iobase, ch + EMU8K_REG_LFO1VAL,  0x0000);
-            emu8k_write(iobase, ch + EMU8K_REG_ATKHLD,   0x0000);
-            emu8k_write(iobase, ch + EMU8K_REG_LFO2VAL,  0x0000);
+            emu8k_write(iobase, ch + EMU8K_REG_ENVVOL,   0x8000);
+            emu8k_write(iobase, ch + EMU8K_REG_ENVVAL,   0x8000);
+            emu8k_write(iobase, ch + EMU8K_REG_DCYSUS,   0x7F7F);
+            emu8k_write(iobase, ch + EMU8K_REG_ATKHLDV,  0xFF7F);
+            emu8k_write(iobase, ch + EMU8K_REG_LFO1VAL,  0x8000);
+            emu8k_write(iobase, ch + EMU8K_REG_ATKHLD,   0xFF7F);
+            emu8k_write(iobase, ch + EMU8K_REG_LFO2VAL,  0x8000);
             emu8k_write(iobase, ch + EMU8K_REG_IP,       0x0000);
-            emu8k_write(iobase, ch + EMU8K_REG_IFATN,    0x0000);
+            emu8k_write(iobase, ch + EMU8K_REG_IFATN,    0xFF00);
             emu8k_write(iobase, ch + EMU8K_REG_PEFE,     0x0000);
             emu8k_write(iobase, ch + EMU8K_REG_FMMOD,    0x0000);
             emu8k_write(iobase, ch + EMU8K_REG_TREMFREQ, 0x0000);

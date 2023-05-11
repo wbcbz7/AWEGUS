@@ -1,7 +1,7 @@
 ﻿alright, here is some hardcore shit
 
   AWEGUS - Gravis Ultrasound "emulator" for Sound Blaster AWE32/64 v.0.20beta
-            absolutely copyleft (cl) 2o22 Artem Vasilev - wbcbz7
+           absolutely copyleft (cl) 2o22-2o23 Artem Vasilev - wbcbz7
 
  1. wtf?
  
@@ -21,7 +21,7 @@
   - IRQ emualtion supports Timer IRQ and can use SB16 dummy playback, COM1 or
     COM2 interrupts as timing source. DMA Terminal Count IRQ coming soon :)
     wavetable/volume ramp IRQs are not supported
-  - experimental DMA upload emulation (channels 0-3 only)
+  - experimental DMA upload emulation
   - Timer Data (2x9) and Index (2xA) readback are also emulated to pass some
     more detection checks
   - volume ramping is "emulated" by instant slewing to ramp start/end volume,
@@ -30,8 +30,8 @@
     but this also require logarithmic pitch to be used instead of linear delta
     again, not impossible but will complicate and slow emulation a bit.
   - all channels are processed at full 44100 Hz
-  - max. 28 channels supported (ch 28-29 are reserved for DRAM read/write, and
-    30-31 do FM passthrough and DRAM refresh). GUS channels 28-31 are dropped.
+  - max. 28 (or 30 channels with --nofm option) are supported. GUS channels 
+    above that limit are dropped.
   - sample frequencies above 176 kHz are silently dropped (EMU8000 limitation)
 
  AWEGUS is done in two distinct versions:
@@ -133,6 +133,9 @@
         - disable DRAM write position autoincrement. affects both 3x7 and DMA
           enable this if you have encountered issues with ISA memory refresh
           or sample data corruption
+    -f  --nofm
+        - disable FM passthrough and allocate channels 31/32 for DRAM access
+          increases emulated GUS channels pool from 28 to 30 channels
     -i[x], --irq=[x]
         - enable IRQ emulation, x:
             0 - use SB16 in dummy playback mode (default)
@@ -157,6 +160,7 @@
         speaks of itself :) play silent 8bit sample over and over at 5kHz
         uses regular SB port, IRQ and DMA resources from BLASTER variable
         of course, you're not able to use SB16 in DOS applications then.
+        (NOTE: BROKEN IN THIS RELEASE)
       x = 1,2 : use COM1/COM2 as timing source
         abuse 8250 UART to send null character at arbitrary baud rate, and
         use transmit buffer empty IRQ as timing source. may not work in some
@@ -185,8 +189,6 @@
     optionally an IRQ). simple yet enough for most GUS players.
     circular buffer playback perhaps will not work (it needs wave IRQs anyway)
 
-    NB: only 8bit DMA channels are emulated!
-
  7. more stuff
     right now seems to work well with apps using GusPlay by Cascada, other
     players may still bug a bit or break completely. see BUGS.md
@@ -197,7 +199,7 @@
  7. license
     alright (broken formatting incoming):
 
-Copyright (c) 2022 Artem Vasilev - wbcbz7
+Copyright (c) 2022-2023 Artem Vasilev - wbcbz7
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
