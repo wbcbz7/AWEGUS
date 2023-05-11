@@ -221,7 +221,7 @@ register map:
       - 3x2-3x3 (word)
       - 3x4-3x7 (dword)
       - 2x8-2xB (dword) 
-        - 3xB is not much important (used to IRQ/DMA configuration), but 3xA
+        - 2xB is not much important (used to IRQ/DMA configuration), but 2xA
           is queried in detection routines, so we need to trap it anyway
       - 2x6 (byte)
         - 2x6 is required for IRQ operation, 2x0 is write-only and most

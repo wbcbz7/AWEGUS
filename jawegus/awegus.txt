@@ -183,7 +183,7 @@
     AWEGUS reads 8237 and DMA page registers to get buffer address and size.
     then, is simply copies data to EMU8000 DRAM and signals DMA completion (and 
     optionally an IRQ). simple yet enough for most GUS players.
-    circular biffer playback perhaps will not work (it needs wave IRQs anyway)
+    circular buffer playback perhaps will not work (it needs wave IRQs anyway)
 
     NB: only 8bit DMA channels are emulated!
 

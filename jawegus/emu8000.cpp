@@ -71,8 +71,13 @@ void emu8k_dramDisable(uint32_t iobase) {
     emu8k_waitForWriteFlush(iobase);
 
     // deallocate channels
-    for (int ch = 0; ch < 30; ch++) 
-        emu8k_write(iobase, ch + EMU8K_REG_CCCA, 0);
+    for (int ch = 0; ch < 30; ch++) {
+        emu8k_write(iobase, ch + EMU8K_REG_PTRX, 0);
+        emu8k_write(iobase, ch + EMU8K_REG_CPF,  0);
+        emu8k_write(iobase, ch + EMU8K_REG_VTFT, 0);
+        emu8k_write(iobase, ch + EMU8K_REG_CVCF, 0);
+        emu8k_write(iobase, ch + EMU8K_REG_CCCA, 0);        // disable memory access last
+    }
 
     // don't touch envelope generator, leave it disabled
 }
