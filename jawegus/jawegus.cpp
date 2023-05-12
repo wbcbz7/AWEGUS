@@ -54,6 +54,7 @@ cmdline_params_t cmdline_params[] = {
     {0,   CMD_FLAG_INT,     "MEM",      &gusemu_cmdline.dramsize, 0},
     {'M', CMD_FLAG_BOOL,    "MONO",     &gusemu_cmdline.mono, 0},
     {'D', CMD_FLAG_BOOL,    "DMA",      &gusemu_cmdline.dmaemu, 0},
+    {'F', CMD_FLAG_BOOL,    "NOFM",     &gusemu_cmdline.disable_fm, 0},
     {0,   CMD_FLAG_BOOL,    "IRQHACK",  &gusemu_cmdline.ignore_2x6, 0},
     {'I', CMD_FLAG_INT,     "IRQ",      &gusemu_cmdline.irqemu, 0},
 };
@@ -75,6 +76,7 @@ void showHelp() {
         "       1 - use COM1 at 0x3F8/IRQ4\r\n"
         "       2 - use COM2 at 0x2F8/IRQ3\r\n"
         " -d, --dma        - enable DMA emulation\r\n"
+        " -f, --nofm       - disable FM passthru, enable GUS channels 28 and 29\r\n"
         "     --irqhack    - ignore non-zero IRQ status (2x6) and always send IRQ\r\n"
         "\r\n"
     );
@@ -189,6 +191,7 @@ int install(char *cmdline) {
     if (gusemu_cmdline.en16bit)     init_data.emuflags |= GUSEMU_16BIT_SAMPLES;
     if (gusemu_cmdline.mono)        init_data.emuflags |= GUSEMU_MONO_PANNING;
   /*if (gusemu_cmdline.slowdram)*/  init_data.emuflags |= GUSEMU_SLOW_DRAM;
+    if (gusemu_cmdline.disable_fm)  init_data.emuflags |= GUSEMU_DISABLE_FM;
     if (gusemu_cmdline.dmaemu)      init_data.emuflags |= GUSEMU_EMULATE_DMA;
     if (gusemu_cmdline.ignore_2x6)  init_data.emuflags |= GUSEMU_IRQ_IGNORE_2X6;
 
@@ -246,8 +249,8 @@ int uninstall() {
 
 int __stdcall DllMain(int module, int reason, struct jlcomm *jlcomm) {
     puts(
-        "AWEGUS - Gravis Ultrasound emulator for AWE32/64, Jemm-based, v.0.20beta\r\n"
-        "by wbcbz7 11.12.2o22\r\n"
+        "AWEGUS - Gravis Ultrasound emulator for AWE32/64, Jemm-based, v.0.21\r\n"
+        "by wbcbz7 11.o5.2o23\r\n"
     );
 #ifdef EXCEPTION_DEBUG
     printf("DllMain base: %08X\r\n", &DllMain);

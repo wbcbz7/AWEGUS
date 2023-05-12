@@ -609,9 +609,6 @@ void gusemu_update_channel(uint32_t ch, uint32_t flags) {
             emuchan->flags |=  EMUSTATE_CHAN_ONESHOT;
             flags |= GUSEMU_CHAN_UPDATE_LOOPSTART;
         }
-        // update loop start if loop bit changed
-        //if ((guschan->ctrl.h ^ guschan->ctrl_r.h) & (1 << 3))
-        //    flags |= GUSEMU_CHAN_UPDATE_LOOPSTART;
 
         if (!(guschan->ctrl.h & 3) && (guschan->ctrl_r.h & 3))
             flags |= GUSEMU_CHAN_UPDATE_START;

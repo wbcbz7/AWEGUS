@@ -53,7 +53,7 @@ void emu8k_dramDisable(uint32_t iobase, uint32_t startChannel, uint32_t channels
     emu8k_waitForWriteFlush(iobase);
 
     // deallocate channels
-    for (int ch = startChannel; ch < (channels - startChannel); ch++) { {
+    for (int ch = startChannel; ch < (channels - startChannel); ch++) {
         emu8k_write(iobase, ch + EMU8K_REG_PTRX, 0);
         emu8k_write(iobase, ch + EMU8K_REG_CPF,  0);
         emu8k_write(iobase, ch + EMU8K_REG_VTFT, 0);
