@@ -136,6 +136,10 @@
     -f  --nofm
         - disable FM passthrough and allocate channels 31/32 for DRAM access
           increases emulated GUS channels pool from 28 to 30 channels
+    -g[x], --gain=[x]
+        - apply volume gain in 0.375 dB units (16 - +6db, 32 - +12db, etc),
+          levels above 0 db (0xFFF for GF1 volume) are clamped to 0 db
+          useful for some players and demos having too quiet sound
     -i[x], --irq=[x]
         - enable IRQ emulation, x:
             0 - use SB16 in dummy playback mode (default)

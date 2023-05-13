@@ -186,11 +186,12 @@ int emu8k_initChannels(uint32_t iobase, uint32_t channels, uint32_t startChannel
             emu8k_write(iobase, ch + EMU8K_REG_ATKHLD,   0xFF7F);
             emu8k_write(iobase, ch + EMU8K_REG_LFO2VAL,  0x8000);
             emu8k_write(iobase, ch + EMU8K_REG_IP,       0x0000);
-            emu8k_write(iobase, ch + EMU8K_REG_IFATN,    0xFF00);
+            emu8k_write(iobase, ch + EMU8K_REG_IFATN,    0xFFFF);
             emu8k_write(iobase, ch + EMU8K_REG_PEFE,     0x0000);
             emu8k_write(iobase, ch + EMU8K_REG_FMMOD,    0x0000);
             emu8k_write(iobase, ch + EMU8K_REG_TREMFREQ, 0x0000);
             emu8k_write(iobase, ch + EMU8K_REG_FM2FRQ2,  0x0000);
+            emu8k_write(iobase, ch + EMU8K_REG_DCYSUSV,  0xFFFF);
         }
 
         // init sound generator

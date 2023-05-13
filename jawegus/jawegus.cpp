@@ -57,6 +57,7 @@ cmdline_params_t cmdline_params[] = {
     {'F', CMD_FLAG_BOOL,    "NOFM",     &gusemu_cmdline.disable_fm, 0},
     {0,   CMD_FLAG_BOOL,    "IRQHACK",  &gusemu_cmdline.ignore_2x6, 0},
     {'I', CMD_FLAG_INT,     "IRQ",      &gusemu_cmdline.irqemu, 0},
+    {'G', CMD_FLAG_INT,     "GAIN",     &gusemu_cmdline.gain, 0}
 };
 
 // --------------

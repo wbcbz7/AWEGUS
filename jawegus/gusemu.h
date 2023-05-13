@@ -38,6 +38,8 @@ struct gusemu_cmdline_t {
     bool        dmaemu;         // emulate dma
     bool        ignore_2x6;     // ignore 2x6 and always send IRQ
     bool        disable_fm;     // disable FM passthru, add channels 30-31 to the pool
+    uint32_t    gain;           // volume gain in 0.375 db units
+    uint32_t    mute_threshold; // mute (-inf) threshold in 0.376 db units
 };
 
 enum {
@@ -272,7 +274,7 @@ struct gus_emu8k_state_t {
         uint32_t pos, loopstart, loopend;
         uint16_t freq, volume;
         uint8_t  pan, reverb, chorus, dummy;
-        uint32_t dummy2;
+        uint16_t logpitch, logvolume;
     } chan[32];
 
     // real active channels count
@@ -377,10 +379,11 @@ enum {
 };
 
 enum {
-    EMUSTATE_CHAN_ONESHOT       = (1 << 0),
-    EMUSTATE_CHAN_16BIT         = (1 << 1),
-    EMUSTATE_CHAN_BIDIR         = (1 << 2),
-    EMUSTATE_CHAN_INVALID_POS   = (1 << 3),
+    EMUSTATE_CHAN_ONESHOT           = (1 << 0),
+    EMUSTATE_CHAN_16BIT             = (1 << 1),
+    EMUSTATE_CHAN_BIDIR             = (1 << 2),
+    EMUSTATE_CHAN_INVALID_POS       = (1 << 3),
+    EMUSTATE_CHAN_RAMP_IN_PROGRESS  = (1 << 4),
 };
 
 // timer update flags
