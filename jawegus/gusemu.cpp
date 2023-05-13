@@ -63,8 +63,11 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
 
         // reset external GUS register
         gus_state.mixctrl    = 0x01;                        // mixctrl, 2x0
+        gus_state.sel_2xb    = 0;                           // 2xB register select, 2xF
 
-        // reset active channels count
+        // reset GF1 registers
+        gus_state.pagereg.w             = 0;
+        gus_state.gf1regs.reflected_io  = 0;
         gus_state.gf1regs.active_channels   = 0xCD;         // 14 active channels
         emu8k_state.active_channels =                       // to trigger all channels update
         emu8k_state.max_channels =
@@ -99,14 +102,11 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
     gus_state.timerindex = 0;                           // timer index, 2x8
     gus_state.timerlatch = 0;                           // timer data latch
     gus_state.timerdata  = 0;                           // timer data,  2x9
-    gus_state.sel_2xb    = 0;                           // 2xB register select, 2xF
 
     // reset current gain
     gus_state.gain = gus_state.gain_init;
 
     // reset GF1 registers
-    gus_state.pagereg.w             = 0;
-    gus_state.gf1regs.reflected_io  = 0;
     gus_state.gf1regs.timer1count.w = 0;
     gus_state.gf1regs.timer2count.w = 0;
     gus_state.gf1regs.timerctrl.w   = 0;
@@ -140,7 +140,6 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
 
     // stop emu8k channels
     for (int ch = 0; ch < emu8k_state.max_channels; ch++) {
-        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_DCYSUSV, 0xFFFF);  // disable EG + ramp up to sustain 7F
         emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_IP,      0x0000);
         emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_IFATN,   0xFFFF);  // volume at -inf / 0.0
 
@@ -432,6 +431,8 @@ void gusemu_update_active_channel_count() {
 
     // save new active channels count
     emu8k_state.active_channels = newchans;
+
+    // TODO: optionally recalc pitch for active channels (fix for impulse tracker?)
 }
 
 // get and translate current playing position
@@ -452,19 +453,29 @@ uint32_t gusemu_get_current_pos(uint32_t ch) {
 // process output enable
 void gusemu_process_output_enable() {
     if (((gus_state.gf1regs.reset & 2) == 0) || (((gus_state.mixctrl & 2) != 0))) {
+        emu8k_disableOutput(emu8k_state.iobase);
+        /*
         gus_state.emuflags |=  GUSEMU_STATE_MUTED;
         // save current volume and mute channels
         for (int ch = 0 ; ch < emu8k_state.active_channels; ch++) {
             if ((emu8k_state.chan[ch].flags & EMUSTATE_CHAN_INVALID_POS) == 0)
-                emu8k_state.chan[ch].volume = emu8k_read(emu8k_state.iobase, ch + EMU8K_REG_CVCF) >> 16;
+                emu8k_state.chan[ch].volume = emu8k_read(emu8k_state.iobase, ch + EMU8K_REG_ENVVOL);
+            emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_IFATN, 0xFFFF);
+            emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_VTFT,  0x0000FFFF);
+            emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CVCF,  0x0000FFF);
         }
+        */
     } else {
+        emu8k_enableOutput(emu8k_state.iobase);
+        /*
         gus_state.emuflags &= ~GUSEMU_STATE_MUTED;
         // restore current volume
         for (int ch = 0 ; ch < emu8k_state.active_channels; ch++) {
-            if ((emu8k_state.chan[ch].flags & EMUSTATE_CHAN_INVALID_POS) == 0)
-                emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CVCF, (emu8k_state.chan[ch].volume << 16) | 0xFFFF);
+            if ((emu8k_state.chan[ch].flags & EMUSTATE_CHAN_INVALID_POS) == 0) {
+                emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_IFATN, 0xFF00);
+            }
         }
+        */
     }
 }
 
