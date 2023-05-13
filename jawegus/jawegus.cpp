@@ -68,17 +68,18 @@ void showHelp() {
         " usage: JLOAD JAWEGUS.EXE [params...]\r\n"
         " parameters:\r\n"
         "\r\n"
-        " -?, -h, --help   - this help\r\n"
-        " -w, --16bit      - enable 16bit samples (needs 1.5x more DRAM, slower upload)\r\n"
-        " -m, --mono       - force mono panning\r\n"
-        "     --mem=[x]    - limit emulated GUS DRAM to x kbytes\r\n"
-        " -i[x], --irq=[x] - enable IRQ emulation, x: \r\n"
+        " -?, -h, --help    - this help\r\n"
+        " -w, --16bit       - enable 16bit samples (needs 1.5x more DRAM, slower upload)\r\n"
+        " -m, --mono        - force mono panning\r\n"
+        "     --mem=[x]     - limit emulated GUS DRAM to x kbytes\r\n"
+        " -g[x], --gain=[x] - volume gain in 0.375 dB units (e.g. -g16 = +6db) \r\n"
+        " -i[x], --irq=[x]  - enable IRQ emulation, x: \r\n"
         "       0 - use SB16 in dummy playback mode (default)\r\n"
         "       1 - use COM1 at 0x3F8/IRQ4\r\n"
         "       2 - use COM2 at 0x2F8/IRQ3\r\n"
-        " -d, --dma        - enable DMA emulation\r\n"
-        " -f, --nofm       - disable FM passthru, enable GUS channels 28 and 29\r\n"
-        "     --irqhack    - ignore non-zero IRQ status (2x6) and always send IRQ\r\n"
+        " -d, --dma         - enable DMA emulation\r\n"
+        " -f, --nofm        - disable FM passthru, enable GUS channels 28 and 29\r\n"
+        "     --irqhack     - ignore non-zero IRQ status (2x6) and always send IRQ\r\n"
         "\r\n"
     );
 }
@@ -195,6 +196,9 @@ int install(char *cmdline) {
     if (gusemu_cmdline.disable_fm)  init_data.emuflags |= GUSEMU_DISABLE_FM;
     if (gusemu_cmdline.dmaemu)      init_data.emuflags |= GUSEMU_EMULATE_DMA;
     if (gusemu_cmdline.ignore_2x6)  init_data.emuflags |= GUSEMU_IRQ_IGNORE_2X6;
+
+    init_data.gain              = gusemu_cmdline.gain;
+    init_data.mute_threshold    = gusemu_cmdline.mute_threshold;
 
     // init IRQ emulation info
     if (gusemu_cmdline.irqemu < IRQEMU_MODE_COUNT) {

@@ -204,7 +204,7 @@ register map:
 
       volume ramping is done by adding/subtracting increment value to
       current volume every 2^(rate * 3) sample processed, until ramp
-      boundary (either start of end, depending on direction) is reached.
+      boundary (either start or end, depending on direction) is reached.
       that is, if sample rate is 22050Hz (28 channels active), and ramp
       rate is 01, then ramp update rate is 22050/8 = 2756.25 Hz
 

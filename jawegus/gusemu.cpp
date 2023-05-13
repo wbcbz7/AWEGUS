@@ -61,12 +61,24 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
         gus_state.iobase = 0;
         gus_state.irq    = gus_state.dma = -1;
 
+        // reset external GUS register
+        gus_state.mixctrl    = 0x01;                        // mixctrl, 2x0
+
+        // reset active channels count
+        gus_state.gf1regs.active_channels   = 0xCD;         // 14 active channels
+        emu8k_state.active_channels =                       // to trigger all channels update
+        emu8k_state.max_channels =
+            (gus_state.emuflags & GUSEMU_DISABLE_FM) ? 
+            GUSEMU_MAX_EMULATED_CHANNELS_NOFM :
+            GUSEMU_MAX_EMULATED_CHANNELS; 
+
         // reset EMU8000
         gusemu_emu8k_reset();
 
         // clear all GF1 registers
         for (int ch = 0; ch < 32; ch++) {
             tiny_memset(&gus_state.gf1regs.chan[ch], 0, sizeof(gus_state.gf1regs.chan[ch]));
+            tiny_memset(emu8k_state.chan + ch, 0, sizeof(emu8k_state.chan[0]));
         }
     }
 
@@ -84,16 +96,13 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
 
     // NOTE: interwave docs mention that not all registers are actually reset
     // reset general registers to defaults
-    gus_state.mixctrl    = 0x03;                        // mixctrl, 2x0
     gus_state.timerindex = 0;                           // timer index, 2x8
+    gus_state.timerlatch = 0;                           // timer data latch
     gus_state.timerdata  = 0;                           // timer data,  2x9
     gus_state.sel_2xb    = 0;                           // 2xB register select, 2xF
-    gus_state.gf1regs.active_channels   = 0xCD;         // 14 active channels
-    emu8k_state.active_channels =                       // to trigger all channels update
-    emu8k_state.max_channels =
-        (gus_state.emuflags & GUSEMU_DISABLE_FM) ? 
-        GUSEMU_MAX_EMULATED_CHANNELS_NOFM :
-        GUSEMU_MAX_EMULATED_CHANNELS; 
+
+    // reset current gain
+    gus_state.gain = gus_state.gain_init;
 
     // reset GF1 registers
     gus_state.pagereg.w             = 0;
@@ -108,13 +117,10 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
 
     // reset channel registers
     for (int ch = 0; ch < 32; ch++) {
-        // reset EMU8000 state and mute channel
-        tiny_memset(emu8k_state.chan + ch, 0, sizeof(emu8k_state.chan[0]));
-
         // reset GUS state
 
-        gus_state.gf1regs.chan[ch].ctrl.w       = 0x0100;   // 00: control
-        gus_state.gf1regs.chan[ch].ctrl_r.w     = 0x0100;   // 00: control prev
+        gus_state.gf1regs.chan[ch].ctrl.w      |= 0x0100;   // 00: control
+        gus_state.gf1regs.chan[ch].ctrl_r.w    |= 0x0100;   // 00: control prev
         /*
         gus_state.gf1regs.chan[ch].freq.w       = 0x0400;   // 01: freq
         gus_state.gf1regs.chan[ch].start_high.w = 0x0000;   // 02: start high
@@ -129,7 +135,7 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
         gus_state.gf1regs.chan[ch].pos_high.w   = 0x0000;   // 0B: pos   low
         gus_state.gf1regs.chan[ch].pan.w        = 0x0700;   // 0C: pan
         */
-        gus_state.gf1regs.chan[ch].volctrl.w    = 0x0100;   // 0D: ramp  control
+        gus_state.gf1regs.chan[ch].volctrl.w   |= 0x0100;   // 0D: ramp  control
     }
 
     // stop emu8k channels
@@ -142,6 +148,7 @@ uint32_t gusemu_reset(bool full_reset, bool touch_reset_reg) {
         emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CPF,  0x00000000);
         emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_VTFT, 0x0000FFFF);
         emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_CVCF, 0x0000FFFF);
+        emu8k_state.chan[ch].flags |= EMUSTATE_CHAN_INVALID_POS;
     }
 
     // reinit active channels
@@ -170,6 +177,9 @@ uint32_t gusemu_init(gusemu_init_t *init) {
     gus_state.intr              = (gus_state.irq >= 8) ? gus_state.irq + 0x70 : gus_state.irq + 8;
     gus_state.dma               = init->gusdma;
     emu8k_state.iobase          = init->emubase;
+    gus_state.gain              = init->gain;
+    gus_state.gain_init         = init->gain;
+    gus_state.mute_threshold    = init->mute_threshold;
 
     // install port traps
     if (iotrap_install(gus_state.iobase) == 0) {
@@ -286,55 +296,71 @@ uint32_t gusemu_translate_volume(uint32_t gf1vol) {
     return (gf1vol == 0) ? 0 : ((4096 + (gf1vol & 0xFFF)) << (gf1vol >> 12)) >> 12; // ugh
 }
 
+// transate gf1->emu8k log volume, gf1vol in 4.12 format
+uint32_t gusemu_translate_log_volume(uint32_t gf1vol) {
+    // apply mute threshold
+    if (gf1vol > gus_state.mute_threshold) {
+        // apply gain
+        gf1vol += (gus_state.gain << 8);
+        if (gf1vol > 0xFFFF) {
+            // limit gain until next GF1 reset
+            gus_state.gain -= ((gf1vol - 0xFFFF) >> 8);
+            gf1vol = 0xFFFF;
+        }
+    } else gf1vol = 0;
+
+    // rescale to sustain 00..7F range (7 bit, yuck!)
+    return (gf1vol >> 1) & 0x7F00;
+}
+
 // start/stop volume ramping, depending on conditions
-void gusemu_set_volume(int ch, int flags) {
+void gusemu_process_ramp(int ch) {
     gus_emu8k_state_t::emu8k_chan_t *emuchan = &emu8k_state.chan[ch];
     gf1regs_channel_t *guschan = &gus_state.gf1regs.chan[ch];
 
-    if (flags & GUSEMU_CHAN_UPDATE_VOLCTRL) {
-        if (guschan->volctrl.h & 3) {
-            // stop volume ramp
-            uint32_t vol = gusemu_get_current_volume(ch);
-            emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_DCYSUSV,
-                0x807F | ((vol >> 1) & 0x7F00));
-            emu8k_state.chan[ch].flags &= ~EMUSTATE_CHAN_RAMP_IN_PROGRESS;
-
-        } else {
-            // start it!
-            // get volume ramp direction
-            uint32_t targetvol;
-            if (guschan->volctrl.h & (1 << 6)) {
-                // ramp down, proceed as usual
-                targetvol = (guschan->ramp_start.w >> 1) & 0x7F00;
-            } else {
-                // ramp up - emu8k EG does this instantly
-                targetvol = (guschan->ramp_end.w >> 1) & 0x7F00;
-            }
-            
-            // get release time value from the table
-            int release_time = gf1_to_emu8k_volramp_tab[emu8k_state.active_channels - 14][guschan->ramp_rate.h];
-            if (release_time != 0xFF) {
-                if (release_time == 0xFE) release_time = 0x7F;  // dirty hack for too short ramps
-                // start the ramp
-                emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_DCYSUSV,
-                    0x8000 | release_time | targetvol);
-            }
-            emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_IFATN, 0xFF00);
-            // mark volume ramp in progress
-            emu8k_state.chan[ch].flags |= EMUSTATE_CHAN_RAMP_IN_PROGRESS;
-        }
-    } else if (flags & GUSEMU_CHAN_UPDATE_VOLUME) {
-        // update the volume as-is
-        // unfortunately ENVVOL is not writable (writes goes to the delay time register),
-        // and volume ramping is not instant at all
-        // so we have to work this around somehow
-        // for now, stop ramp in progress and slew to the target volume (slooooowwww...)
+    if (guschan->volctrl.h & 3) {
+        // stop volume ramp
+        uint32_t vol = gusemu_translate_log_volume(gusemu_get_current_volume(ch));
         emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_DCYSUSV,
-            0x807F | ((gus_state.gf1regs.chan[ch].volume.w >> 1) & 0x7F00));
-        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_IFATN, 0xFF00);
+            0x807F | vol);
         emu8k_state.chan[ch].flags &= ~EMUSTATE_CHAN_RAMP_IN_PROGRESS;
-    };
 
+    } else {
+        // start it!
+        // get volume ramp direction
+        uint32_t targetvol;
+        if (guschan->volctrl.h & (1 << 6)) {
+            // ramp down, proceed as usual
+            targetvol = guschan->ramp_start.w;
+        } else {
+            // ramp up - emu8k EG does this instantly
+            targetvol = guschan->ramp_end.w;
+        }
+        targetvol = gusemu_translate_log_volume(targetvol);
+        
+        // get release time value from the table
+        int release_time = gf1_to_emu8k_volramp_tab[emu8k_state.active_channels - 14][guschan->ramp_rate.h];
+        if (release_time != 0xFF) {
+            if (release_time == 0xFE) release_time = 0x7F;  // dirty hack for too short ramps
+            // start the ramp
+            emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_DCYSUSV,
+                0x8000 | release_time | targetvol);
+        }
+        emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_IFATN, 0xFF00);
+        // mark volume ramp in progress
+        emu8k_state.chan[ch].flags |= EMUSTATE_CHAN_RAMP_IN_PROGRESS;
+    }
+}
+void gusemu_set_volume(int ch) {
+    // update the volume as-is
+    // unfortunately ENVVOL is not writable (writes go to the delay time register),
+    // and volume ramping is not instant at all
+    // so we have to work this around somehow
+    // for now, stop ramp in progress and slew to the target volume (slooooowwww...)
+    emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_DCYSUSV,
+        0x807F | (gusemu_translate_log_volume(gus_state.gf1regs.chan[ch].volume.w)));
+    emu8k_write(emu8k_state.iobase, ch + EMU8K_REG_IFATN, 0xFF00);
+    emu8k_state.chan[ch].flags &= ~EMUSTATE_CHAN_RAMP_IN_PROGRESS;
 }
 
 // mute envelope generator
@@ -789,13 +815,13 @@ void gusemu_update_channel(uint32_t ch, uint32_t flags) {
             }
         }
         if ((force_update) || (flags & GUSEMU_CHAN_UPDATE_VOLCTRL)) {
-            gusemu_set_volume(ch, flags & GUSEMU_CHAN_UPDATE_VOLCTRL);
+            gusemu_process_ramp(ch);
         }
         if ((force_update) || (flags & GUSEMU_CHAN_UPDATE_VOLUME)) {
             if (gus_state.emuflags & GUSEMU_STATE_MUTED) {
                 gusemu_mute_volume(ch);
             } else {
-                gusemu_set_volume(ch, flags & GUSEMU_CHAN_UPDATE_VOLUME);
+                gusemu_set_volume(ch);
             }
         }
         // reset invalid position flag

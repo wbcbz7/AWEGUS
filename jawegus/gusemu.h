@@ -24,6 +24,9 @@ struct gusemu_init_t {
     uint16_t gusbase;       // emulated gus base
     uint8_t  gusirq;        // emulated gus irq
     uint8_t  gusdma;        // emulated gus dma
+
+    int32_t  gain;              // volume gain
+    int32_t  mute_threshold;
 };
 #pragma pack(pop)
 
@@ -38,8 +41,8 @@ struct gusemu_cmdline_t {
     bool        dmaemu;         // emulate dma
     bool        ignore_2x6;     // ignore 2x6 and always send IRQ
     bool        disable_fm;     // disable FM passthru, add channels 30-31 to the pool
-    uint32_t    gain;           // volume gain in 0.375 db units
-    uint32_t    mute_threshold; // mute (-inf) threshold in 0.376 db units
+    int32_t     gain;           // volume gain in 0.375 db units
+    int32_t     mute_threshold; // mute (-inf) threshold in GF1 volume, before applying gain
 };
 
 enum {
@@ -254,6 +257,13 @@ struct gus_state_t {
     // 16bit data latch
     gf1reg_t wordlatch;
     uint8_t  wordlatch_active;
+    uint8_t  dummy3;
+
+    // --------------------------------
+    // volume gain/threshold
+    int32_t  gain;
+    int32_t  gain_init;
+    int32_t  mute_threshold;
 
 };
 

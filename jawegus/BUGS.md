@@ -22,7 +22,7 @@ there are lots of bugs :D
 * GUSPlay applications almost always work fine, with minor whining if samples are not looped properly
 * ..same for MIDAS 0.40a, albeit didn't tested it much
 * Impulse Tracker - one-shot samples are cut after first tick, volume bars are broken (only 1st sample is shown correctly). on the other hand, GUS timer works - you need to explicitly provide IRQ in command line to enable GUS timer mode
-  * upd: ITGUSLO.DRV works, volume bars are still broken
+  * upd: ITGUSLO.DRV works (broken pitch in EG version!), volume bars are still broken
 * Scream Tracker 3.x, Second Reality, Unreal/Future Crew (version 1.1 with GUS support) - ~~corrupted samples at 2nd and further module load~~ fine except for minor ultraclick bugs (see below)
   * ~~ST3: load AWEGUS, run ST3, then load any module - plays fine; then, exit from the tracker, run ST3 again - can't detect GUS. running ULTRINIT then running ST3 again didn't help~~
   * upd: ST3 - managed to fix sample corruption but now some channels play wrong samples (some are at +1 octave). must have something with "ultraclick removal" feature?
