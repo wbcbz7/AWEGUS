@@ -983,7 +983,7 @@ void gusemu_gf1_write(uint32_t reg, uint32_t ch, uint32_t data) {
 // dispatch GF1 read
 uint32_t gusemu_gf1_read(uint32_t reg, uint32_t ch) {
     uint32_t data;
-    if ((ch >= 32)) return 0; // unknown register!
+    if ((reg >= 0x80) && (ch >= 32)) return 0; // unknown register!
 
     switch (reg) {
         // global
@@ -994,6 +994,9 @@ uint32_t gusemu_gf1_read(uint32_t reg, uint32_t ch) {
             break;
         case 0x42: // DMA Start Address
             data = gus_state.gf1regs.dmaaddr.w;
+            break;
+        case 0x45: // Timer IRQ Control
+            data = gus_state.gf1regs.timerctrl.w;
             break;
         case 0x49: // Sampling Control
             data = gus_state.gf1regs.recctrl.w;
@@ -1063,7 +1066,7 @@ uint32_t __trapcall gusemu_3x3_r8_trap (uint32_t port, uint32_t data, uint32_t f
     // TODO: reading 3x3 reflects last IO to 3x2-3x5 (not on Interwave)
 };
 uint32_t __trapcall gusemu_3x2_w8_trap (uint32_t port, uint32_t data, uint32_t flags) {
-    gus_state.pagereg.channel = data;
+    gus_state.pagereg.channel = data & 31;
     return data;
 }
 uint32_t __trapcall gusemu_3x3_w8_trap (uint32_t port, uint32_t data, uint32_t flags)  {
@@ -1078,7 +1081,7 @@ uint32_t __trapcall gusemu_3x2_w16_trap(uint32_t port, uint32_t data, uint32_t f
     // real GUS will not respond by asserting IOCS16 and ISA bus controller will break
     // one word transaction to two byte to ports 3x2 (low) and 3x3 (high)
     // but for performance reasons we'll left it that way :)
-    gus_state.pagereg.w = data;
+    gus_state.pagereg.w = data & 0xFF1F;
     return data;
 }
 
@@ -1221,6 +1224,10 @@ uint32_t __trapcall gusemu_2x8_r8_trap(uint32_t port, uint32_t data, uint32_t fl
         timerstatus |= ((1 << 6) | (1 << 7));
     if ((gus_state.timer.flags & (GUSEMU_TIMER_T2_ADLIB_UNMASKED|GUSEMU_TIMER_T2_OVERFLOW)) == (GUSEMU_TIMER_T2_ADLIB_UNMASKED|GUSEMU_TIMER_T2_OVERFLOW))
         timerstatus |= ((1 << 5) | (1 << 7));
+    if ((gus_state.timer.flags & (GUSEMU_TIMER_T1_ADLIB_UNMASKED|GUSEMU_TIMER_T1_IRQ)) == (GUSEMU_TIMER_T1_ADLIB_UNMASKED|GUSEMU_TIMER_T1_IRQ))
+        timerstatus |= ((1 << 2));
+    if ((gus_state.timer.flags & (GUSEMU_TIMER_T2_ADLIB_UNMASKED|GUSEMU_TIMER_T2_IRQ)) == (GUSEMU_TIMER_T2_ADLIB_UNMASKED|GUSEMU_TIMER_T2_IRQ))
+        timerstatus |= ((1 << 1));
     return timerstatus;
 }
 uint32_t __trapcall gusemu_2x8_w8_trap(uint32_t port, uint32_t data, uint32_t flags) {

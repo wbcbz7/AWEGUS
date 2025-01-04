@@ -32,6 +32,7 @@ there are lots of bugs :D
   * alright, I got it - player constantly rewrites channel control (reg 0x00), which in turn, triggers emu8k loop point update, which further triggers current position update. oops.
     also, seems to enable bidir loop without enabling regular loop as well
   * also needs a plenty of low RAM - one part crashed with "not enough memory" but music kept playing and eventually next part started fine; then, a bit later another out of memory crash occured, this time fatal.
+  * UPD 16.05.23: EG version broke it again
 * [Abraham/Plant](https://www.pouet.net/prod.php?which=1201) - ~~some channels play ROM crap alongside with the music~~ now it's much better, but bass sample is not looped (gets cut off) and there is lot of hifreq whining. perhaps bass uses volume ramping for slides
   * upd: ALRIGHT i broke it again :( most samples are cut off early, have absolutely no idea why
 * [Psychic Flight/Spirit](https://www.pouet.net/prod.php?which=41739) - uses OUTSB with ES segment override to upload samples, crashes with GPF
